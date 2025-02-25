@@ -24,6 +24,33 @@ export default function Courses() {
 
   const filteredCourses = courses.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
 
+
+  return (
+    <div className="p-4">
+      <input className="border p-2 mb-4" placeholder="Search (AI placeholder)" onChange={(e) => setSearch(e.target.value)} />
+      {filteredCourses.map(course => (
+        <div key={course.id} className="border p-4 mb-4">
+          <h2 className="text-xl">{course.title}</h2>
+          <p>{localStorage.getItem("token") ? course.full_summary : course.short_summary}</p>
+          {localStorage.getItem("token") && (
+            <div>
+              <h3 className="text-lg mt-2">Q&A</h3>
+              <ul>
+                {JSON.parse(course.qa).questions.map((qa, index) => (
+                  <li key={index} className="mt-1">
+                    <strong>Q:</strong> {qa.q} <br />
+                    <strong>A:</strong> {qa.a}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  /*
   return (
     <div className="p-4">
       <input className="border p-2 mb-4" placeholder="Search (AI placeholder)" onChange={(e) => setSearch(e.target.value)} />
@@ -41,5 +68,6 @@ export default function Courses() {
       ))}
     </div>
   );
+  */
 }
 

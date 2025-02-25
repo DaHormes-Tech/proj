@@ -13,7 +13,8 @@ export default function Admin() {
       });
       alert("Course added!");
     } catch (error) {
-      alert("Failed to add course");
+      console.log("Upload error:", error.response?.data || error.message);
+      alert("Failed to add course: " + (error.response?.data?.error || error.message));
     }
   };
 
