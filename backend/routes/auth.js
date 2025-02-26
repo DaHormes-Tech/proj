@@ -5,6 +5,24 @@ const router = express.Router();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// Add retries for transient failures
+async function withRetry(fn, retries = 3, delay = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      console.log(`Retry ${i + 1}/${retries} after error:`, err.message);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+}
+
+/*
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+  auth: { fetch: { timeout: 30000 } } // 30 seconds
+}); */
+
 // Register
 router.post("/register", async (req, res) => {
   const { email, password } = req.body;
@@ -21,13 +39,28 @@ router.post("/register", async (req, res) => {
 });
 
 // Login
+
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return res.status(401).json({ error: error.message });
+    const token = jwt.sign({ id: data.user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    res.json({ token });
+  } catch (err) {
+    console.log("Login error:", err);
+    res.status(500).json({ error: "Login failed, please try again" });
+  }
+});
+
+/*
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return res.status(401).json({ error: error.message });
   const token = jwt.sign({ id: data.user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
   res.json({ token });
-});
+}); */
 
 module.exports = router;
 

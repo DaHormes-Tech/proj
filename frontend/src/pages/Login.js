@@ -5,6 +5,51 @@ import axios from "axios";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const loginUser = async () => {
+    try {
+      const { data } = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/login`, { email, password });
+      localStorage.setItem("token", data.token);
+      alert("Login Successful");
+      window.location.href = "/courses";
+    } catch (error) {
+      const msg = error.response?.data?.error || "Login failed, please try again";
+      setError(msg);
+    }
+  };
+
+  const registerUser = async () => {
+    try {
+      const { data } = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/register`, { email, password });
+      localStorage.setItem("token", data.token);
+      alert("Registration Successful");
+      window.location.href = "/courses";
+    } catch (error) {
+      const msg = error.response?.data?.error || "Registration Failed";
+      setError(msg);
+    }
+  };
+
+  return (
+    <div className="p-4 max-w-md mx-auto">
+      <h1 className="text-2xl mb-4">Login / Register</h1>
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+      <input className="border p-2 m-2 w-full rounded" type="email" placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
+      <input className="border p-2 m-2 w-full rounded" type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+      <button className="bg-blue-500 text-white p-2 m-2 w-full rounded" onClick={loginUser}>Login</button>
+      <button className="bg-green-500 text-white p-2 m-2 w-full rounded" onClick={registerUser}>Register</button>
+    </div>
+  );
+}
+
+/*
+import { useState } from "react";
+import axios from "axios";
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const loginUser = async () => {
     try {
@@ -25,3 +70,4 @@ export default function Login() {
   );
 }
 
+*/

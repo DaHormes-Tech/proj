@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
 
 // Load environment variables first
 dotenv.config();
@@ -24,7 +26,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/courses", courseRoutes);
 
-app.get("/", (req, res) => res.send("EdTech API running"));
+app.get("/", (req, res) => res.send("EdTeech API running"));
 
 // Start server
 const PORT = process.env.PORT || 65269;
