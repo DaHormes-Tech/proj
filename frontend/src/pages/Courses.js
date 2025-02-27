@@ -3,10 +3,69 @@ import { useState, useEffect } from "react";
 import { db, syncCourses } from "../database";
 import axios from "axios";
 import CourseCard from "../components/CourseCard";
+import { Link } from "react-router-dom";
 
 export default function Courses() {
   const [courses, setCourses] = useState([]);
   const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+        console.log("Fetched courses from API:", data); // Debug log
+        const parsedCourses = data.map(course => ({
+          ...course,
+          qa: { questions: [] } //Remove qa from courses, handled by exams
+        }));
+        await syncCourses(parsedCourses);
+        const offlineCourses = await db.courses.toArray();
+        setCourses(offlineCourses);
+        setError("" );
+      } catch (error) {
+        console.log("Fetch error:", error.response?.data || error.message);
+        setError("Failed to load courses. Showing offline data if available.");
+        const offlineCourses = await db.courses.toArray();
+        setCourses(offlineCourses);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  const filteredCourses = courses.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="p-4 max-w-4xl mx-auto">
+      <input className="border p-2 mb-4 w-full rounded" placeholder="Search courses..." onChange={(e) => setSearch(e.target.value)} />
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {filteredCourses.length ? (
+        filteredCourses.map(course => (
+          <div key={course.id} className="mb-4">
+            <CourseCard course={course} />
+            <Link to={`/courses/${course.id}/exam/1`} className="bg-blue-500 text-white p-2 rounded mt-2 block w-full text-center hover:bg-blue-600">
+              Take Exam 1
+            </Link>
+          </div>
+        ))
+      ) : (
+        <p className="text-gray-500">No courses found.</p>
+      )}
+    </div>
+  );
+  
+}
+ 
+/*
+import { useState, useEffect } from "react";
+import { db, syncCourses } from "../database";
+import axios from "axios";
+import CourseCard from "../components/CourseCard";
+
+export default function Courses() {
+  const [courses, setCourses] = useState([]);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -15,7 +74,10 @@ export default function Courses() {
         await syncCourses(data);
         const offlineCourses = await db.courses.toArray();
         setCourses(offlineCourses);
+        setError("");
       } catch (error) {
+        console.log("Fetch error:", error.response?.data || error.message);
+        setError("Failed to load courses. Showing offline data if available.");
         const offlineCourses = await db.courses.toArray();
         setCourses(offlineCourses);
       }
@@ -29,6 +91,7 @@ export default function Courses() {
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <input className="border p-2 mb-4 w-full rounded" placeholder="Search courses..." onChange={(e) => setSearch(e.target.value)} />
+      {error && <p className="text-red-500 mb-4">{error}</p>}
       {filteredCourses.length ? (
         filteredCourses.map(course => <CourseCard key={course.id} course={course} />)
       ) : (
@@ -37,7 +100,7 @@ export default function Courses() {
     </div>
   );
 
-  /*
+
   return (
     <div className="p-4">
       <input className="border p-2 mb-4 w-full" placeholder="Search" onChange={(e) => setSearch(e.target.value)} />
@@ -66,7 +129,7 @@ export default function Courses() {
       ))}
     </div>
   );
-  */
+  *
 }
 
 /*
@@ -141,4 +204,19 @@ export default function Courses() {
   );
   // mini comment end
 }
+*/
+
+
+/*
+return (
+    <div className="p-4 max-w-4xl mx-auto">
+      <input className="border p-2 mb-4 w-full rounded" placeholder="Search courses..." onChange={(e) => setSearch(e.target.value)} />
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {filteredCourses.length ? (
+        filteredCourses.map(course => <CourseCard key={course.id} course={course} />)
+      ) : (
+        <p className="text-gray-500">No courses found.</p>
+      )}
+    </div>
+  );
 */

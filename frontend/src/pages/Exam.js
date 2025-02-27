@@ -1,0 +1,117 @@
+
+import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import axios from "axios";
+
+export default function Exam() {
+  const { courseId, examId } = useParams(); // Get course and exam IDs from URL
+  const [exam, setExam] = useState(null);
+  const [answers, setAnswers] = useState({}); // Track user answers
+  const [submitted, setSubmitted] = useState(false); // Track submission state
+  const [score, setScore] = useState({ fraction: "0/0", percentage: 0 }); // Track score
+
+  // Fetch exam data on mount
+  useEffect(() => {
+    const fetchExam = async () => {
+      try {
+        const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${courseId}`);
+        const selectedExam = data.find(e => e.id === parseInt(examId));
+        if (selectedExam) {
+          // Shuffle questions and options for freshness
+          const shuffledQuestions = shuffleArray(selectedExam.questions.questions.map(q => ({
+            ...q,
+            options: shuffleArray(q.options)
+          })));
+          setExam({ ...selectedExam, questions: { questions: shuffledQuestions } });
+        }
+      } catch (error) {
+        console.log("Fetch exam error:", error.response?.data || error.message); // Log errors
+      }
+    };
+    fetchExam();
+  }, [courseId, examId]);
+
+  // Shuffle array helper (Fisher-Yates)
+  const shuffleArray = (array) => {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  };
+
+  // Handle answer selection
+  const handleAnswerChange = (questionIndex, answer) => {
+    setAnswers(prev => ({ ...prev, [questionIndex]: answer }));
+  };
+
+  // Submit exam
+  const handleSubmit = () => {
+    if (!exam) return;
+    let correct = 0;
+    const total = exam.questions.questions.length;
+    exam.questions.questions.forEach((q, index) => {
+      if (answers[index] === q.correctAnswer) correct++;
+    });
+    const fraction = `${correct}/${total}`;
+    const percentage = Math.round((correct / total) * 100);
+    setScore({ fraction, percentage });
+    setSubmitted(true);
+  };
+
+  // Reset exam (reshuffle)
+  const handleReset = () => {
+    setAnswers({});
+    setSubmitted(false);
+    setScore({ fraction: "0/0", percentage: 0 });
+    if (exam) {
+      const shuffledQuestions = shuffleArray(exam.questions.questions.map(q => ({
+        ...q,
+        options: shuffleArray(q.options)
+      })));
+      setExam(prev => ({ ...prev, questions: { questions: shuffledQuestions } }));
+    }
+  };
+
+  if (!exam) return <div className="p-4">Loading exam...</div>;
+
+  return (
+    <div className="p-4 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">{exam.name} for {courseId}</h1>
+      {exam.questions.questions.map((q, index) => (
+        <div key={index} className="border p-4 mb-4 rounded shadow">
+          <p className="text-lg font-semibold">{q.question}</p>
+          {q.options.map((option, i) => (
+            <label key={i} className="block mt-2">
+              <input
+                type="radio"
+                name={`question-${index}`}
+                value={option}
+                checked={answers[index] === option}
+                onChange={() => handleAnswerChange(index, option)}
+                disabled={submitted}
+                className="mr-2"
+              />
+              {option}
+            </label>
+          ))}
+          {submitted && (
+            <p className="mt-2 text-sm">
+              Correct Answer: <span className={answers[index] === q.correctAnswer ? "text-green-600" : "text-red-600"}>
+                {q.correctAnswer} {answers[index] !== q.correctAnswer && `(Your answer: ${answers[index] || "None"})`}
+              </span>
+            </p>
+          )}
+        </div>
+      ))}
+      {!submitted ? (
+        <button onClick={handleSubmit} className="bg-blue-500 text-white p-2 rounded mt-4">Submit Exam</button>
+      ) : (
+        <div className="mt-4">
+          <p className="text-lg font-bold">Score: {score.fraction} ({score.percentage}%)</p>
+          <button onClick={handleReset} className="bg-gray-500 text-white p-2 rounded mt-2">Reset Exam</button>
+        </div>
+      )}
+    </div>
+  );
+}

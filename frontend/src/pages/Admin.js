@@ -1,41 +1,47 @@
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 
 export default function Admin() {
-  const [form, setForm] = useState({
+  const [courseForm, setCourseForm] = useState({
     title: "",
     short_summary: "",
     full_summary: "",
-    qa: [{ question: "", options: ["", "", "", ""], correctAnswer: "" }],
     faculty: "Science",
     level: 100,
     email: "admin@uniben.edu"
   });
 
+  const [examForm, setExamForm] = useState({
+    courseId: "",
+    name: "Exam 1",
+    questions: [{ question: "", options: ["", "", "", ""], correctAnswer: "" }],
+    email: "admin@uniben.edu"
+  });
+
+  const [file, setFile] = useState(null); // Separate state for file
+
   const addQuestion = () => {
-    setForm({
-      ...form,
-      qa: [...form.qa, { question: "", options: ["", "", "", ""], correctAnswer: "" }]
-    });
+    setExamForm(prev => ({
+      ...prev,
+      questions: [...prev.questions, { question: "", options: ["", "", "", ""], correctAnswer: "" }]
+    }));
   };
 
   const updateQuestion = (index, field, value) => {
-    const newQa = [...form.qa];
+    const newQuestions = [...examForm.questions];
     if (field === "options") {
-      newQa[index].options = value.split("\n").slice(0, 4); // Limit to 4 options
+      newQuestions[index].options = value.split("\n").slice(0, 4);
     } else {
-      newQa[index][field] = value;
+      newQuestions[index][field] = value;
     }
-    setForm({ ...form, qa: newQa });
+    setExamForm({ ...examForm, questions: newQuestions });
   };
 
-  const handleSubmit = async () => {
+  const handleCourseSubmit = async () => {
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-course`, {
-        ...form,
-        qa: { questions: form.qa }
-      });
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-course`, courseForm);
       alert("Course added!");
     } catch (error) {
       console.log("Upload error:", error.response?.data || error.message);
@@ -43,8 +49,26 @@ export default function Admin() {
     }
   };
 
+  const handleExamSubmit = async () => {
+    try {
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-exam/${examForm.courseId}`, {
+        name: examForm.name,
+        questions: examForm.questions,
+        email: examForm.email
+      });
+      alert("Exam added!");
+    } catch (error) {
+      console.log("Exam upload error:", error.response?.data || error.message); // Log errors for debugging
+      alert("Failed to add exam: " + (error.response?.data?.error || error.message));
+    }
+  };
+
   // File upload for Excel
   const handleFileUpload = async () => {
+    if (!file) {
+      alert("Please select a file first!");
+      return;
+    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("email", "admin@uniben.edu");
@@ -52,34 +76,61 @@ export default function Admin() {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData);
       alert("Courses uploaded!");
     } catch (error) {
-      console.log("File upload error:", error.response?.data || error.message);
+      console.log("File upload error:", error.response?.data || error.message); // Log errors for debugging
       alert("Failed to upload file: " + (error.response?.data?.error || error.message));
     }
   };
 
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl">Admin Portal</h1>
-      <input className="border p-2 m-2 w-full" placeholder="Title" onChange={(e) => setForm({ ...form, title: e.target.value })} />
-      <textarea className="border p-2 m-2 w-full" placeholder="Short Summary" onChange={(e) => setForm({ ...form, short_summary: e.target.value })} />
-      <textarea className="border p-2 m-2 w-full" placeholder="Full Summary" onChange={(e) => setForm({ ...form, full_summary: e.target.value })} />
-      <h3 className="text-lg mt-2">Q&A (MCQs)</h3>
-      {form.qa.map((q, index) => (
-        <div key={index} className="border p-2 m-2">
-          <input className="border p-2 m-1 w-full" placeholder="Question" value={q.question} onChange={(e) => updateQuestion(index, "question", e.target.value)} />
-          <textarea className="border p-2 m-1 w-full" placeholder="Options (one per line, max 4)" value={q.options.join("\n")} onChange={(e) => updateQuestion(index, "options", e.target.value)} />
-          <input className="border p-2 m-1 w-full" placeholder="Correct Answer" value={q.correctAnswer} onChange={(e) => updateQuestion(index, "correctAnswer", e.target.value)} />
-        </div>
-      ))}
-      <button className="bg-blue-500 text-white p-2 m-2" onClick={addQuestion}>Add Question</button>
-      <button className="bg-green-500 text-white p-2 m-2" onClick={handleSubmit}>Upload Course</button>
-      <div className="mt-4">
-        <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
-        <button className="bg-purple-500 text-white p-2 m-2" onClick={handleFileUpload}>Upload Excel File</button>
-      </div>
+    <div className="p-4 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Admin Portal</h1>
+      <nav className="mb-4">
+        <Link to="/admin/courses" className="mr-4 text-blue-500 hover:text-blue-700">Courses</Link>
+        <Link to="/admin/exams" className="text-blue-500 hover:text-blue-700">Exams</Link>
+      </nav>
+
+      <Routes>
+        <Route path="/courses" element={
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Add Course</h2>
+            <input className="border p-2 m-2 w-full rounded" placeholder="Title" onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })} />
+            <textarea className="border p-2 m-2 w-full rounded" placeholder="Short Summary" onChange={(e) => setCourseForm({ ...courseForm, short_summary: e.target.value })} />
+            <textarea className="border p-2 m-2 w-full rounded" placeholder="Full Summary" onChange={(e) => setCourseForm({ ...courseForm, full_summary: e.target.value })} />
+            <select className="border p-2 m-2 w-full rounded" onChange={(e) => setCourseForm({ ...courseForm, faculty: e.target.value })}>
+              <option value="Science">Science</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Arts">Arts</option>
+            </select>
+            <input type="number" className="border p-2 m-2 w-full rounded" placeholder="Level (e.g., 100)" onChange={(e) => setCourseForm({ ...courseForm, level: parseInt(e.target.value) || 100 })} />
+            <button onClick={handleCourseSubmit} className="bg-green-500 text-white p-2 rounded mt-2">Upload Course</button>
+            <div className="mt-4">
+              <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
+              <button onClick={handleFileUpload} className="bg-purple-500 text-white p-2 rounded">Upload Excel File</button>
+            </div>
+          </div>
+        } />
+        <Route path="/exams" element={
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Add Exam</h2>
+            <input className="border p-2 m-2 w-full rounded" placeholder="Course ID" onChange={(e) => setExamForm({ ...examForm, courseId: e.target.value })} />
+            <input className="border p-2 m-2 w-full rounded" placeholder="Exam Name (e.g., Exam 1)" onChange={(e) => setExamForm({ ...examForm, name: e.target.value })} />
+            <h3 className="text-lg mt-2">Q&A (MCQs)</h3>
+            {examForm.questions.map((q, index) => (
+              <div key={index} className="border p-2 m-2 rounded">
+                <input className="border p-2 m-1 w-full rounded" placeholder="Question" value={q.question} onChange={(e) => updateQuestion(index, "question", e.target.value)} />
+                <textarea className="border p-2 m-1 w-full rounded" placeholder="Options (one per line, max 4)" value={q.options.join("\n")} onChange={(e) => updateQuestion(index, "options", e.target.value)} />
+                <input className="border p-2 m-1 w-full rounded" placeholder="Correct Answer" value={q.correctAnswer} onChange={(e) => updateQuestion(index, "correctAnswer", e.target.value)} />
+              </div>
+            ))}
+            <button onClick={addQuestion} className="bg-blue-500 text-white p-2 rounded mt-2">Add Question</button>
+            <button onClick={handleExamSubmit} className="bg-green-500 text-white p-2 rounded mt-2">Upload Exam</button>
+          </div>
+        } />
+      </Routes>
     </div>
   );
+
 }
 
 /*
@@ -113,4 +164,29 @@ export default function Admin() {
     </div>
   );
 }
+*/
+
+/*
+return (
+    <div className="p-4">
+      <h1 className="text-2xl">Admin Portal</h1>
+      <input className="border p-2 m-2 w-full" placeholder="Title" onChange={(e) => setForm({ ...form, title: e.target.value })} />
+      <textarea className="border p-2 m-2 w-full" placeholder="Short Summary" onChange={(e) => setForm({ ...form, short_summary: e.target.value })} />
+      <textarea className="border p-2 m-2 w-full" placeholder="Full Summary" onChange={(e) => setForm({ ...form, full_summary: e.target.value })} />
+      <h3 className="text-lg mt-2">Q&A (MCQs)</h3>
+      {form.qa.map((q, index) => (
+        <div key={index} className="border p-2 m-2">
+          <input className="border p-2 m-1 w-full" placeholder="Question" value={q.question} onChange={(e) => updateQuestion(index, "question", e.target.value)} />
+          <textarea className="border p-2 m-1 w-full" placeholder="Options (one per line, max 4)" value={q.options.join("\n")} onChange={(e) => updateQuestion(index, "options", e.target.value)} />
+          <input className="border p-2 m-1 w-full" placeholder="Correct Answer" value={q.correctAnswer} onChange={(e) => updateQuestion(index, "correctAnswer", e.target.value)} />
+        </div>
+      ))}
+      <button className="bg-blue-500 text-white p-2 m-2" onClick={addQuestion}>Add Question</button>
+      <button className="bg-green-500 text-white p-2 m-2" onClick={handleSubmit}>Upload Course</button>
+      <div className="mt-4">
+        <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
+        <button className="bg-purple-500 text-white p-2 m-2" onClick={handleFileUpload}>Upload Excel File</button>
+      </div>
+    </div>
+  );
 */

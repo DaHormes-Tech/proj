@@ -16,11 +16,12 @@ const app = express();
 
 // Middleware and routes
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); // For JSON requests
+app.use(express.urlencoded({ extended: true })); // For form-data parsing
 
 const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payment");
-const courseRoutes = require("./routes/courses");
+const courseRoutes = require("./routes/courses")(upload); //Pass upload here
 
 app.use("/api/auth", authRoutes);
 app.use("/api/payment", paymentRoutes);
