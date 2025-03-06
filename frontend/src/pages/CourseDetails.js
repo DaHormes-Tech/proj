@@ -8,6 +8,7 @@ export default function CourseDetails() {
   const { courseId } = useParams(); // Extract course ID from URL
   const [course, setCourse] = useState(null);
   const [exams, setExams] = useState([]);
+  const [materialUrl, setMaterialUrl] = useState(null); // Store PDF URL
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function CourseDetails() {
           return;
         }
         setCourse(selectedCourse);
+        setMaterialUrl(selectedCourse.materials || null); // Fetch material URL from course
 
         const { data: examData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${courseId}`);
         setExams(examData);
@@ -32,8 +34,8 @@ export default function CourseDetails() {
     fetchData();
   }, [courseId]);
 
-  if (error) return <div className="p-4 text-red-500">{error}</div>; // Display error message
-  if (!course) return <div className="p-4">Loading...</div>; // Show loading while fetching
+  if (error) return <div className="p-4 text-red-500">{error}</div>;
+  if (!course) return <div className="p-4">Loading...</div>;
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
@@ -43,7 +45,25 @@ export default function CourseDetails() {
       <p><strong>Full Summary:</strong> {course.full_summary}</p>
       <p><strong>Faculty:</strong> {course.faculty}</p>
       <p><strong>Level:</strong> {course.level}</p>
-      <p><strong>Course Materials:</strong> [Placeholder - Add material upload logic later]</p>
+      <div className="mt-4">
+        <h2 className="text-xl font-semibold">Course Materials</h2>
+        {materialUrl ? (
+          <div>
+            <iframe
+              src={`${materialUrl}#toolbar=0&navpanes=0&view=FitH`}
+              title="Course Material"
+              width="100%"
+              height="600px"
+              style={{ border: "none" }}
+            />
+            <a href={materialUrl} download className="bg-blue-500 text-white p-2 rounded mt-2 inline-block hover:bg-blue-600">
+              Download PDF
+            </a>
+          </div>
+        ) : (
+          <p className="text-gray-500">No materials available</p>
+        )}
+      </div>
       <div className="mt-4">
         <h2 className="text-xl font-semibold">Exams</h2>
         {exams.length > 0 ? (

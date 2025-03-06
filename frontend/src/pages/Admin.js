@@ -19,29 +19,29 @@ export default function Admin() {
     questions: [{ question: "", options: ["", "", "", ""], correctAnswer: "" }],
     email: "admin@uniben.edu"
   });
-  const [file, setFile] = useState(null);
-  const [courses, setCourses] = useState([]); // Store available courses
-  const [exams, setExams] = useState({}); // Store exams by courseId
-  const location = useLocation(); // Track current URL for debugging
+  const [file, setFile] = useState(null); // For course/exam files
+  const [materialFile, setMaterialFile] = useState(null); // For material (PDF) upload
+  const [courses, setCourses] = useState([]);
+  const [exams, setExams] = useState({});
+  const location = useLocation();
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
-        setCourses(data); // Fetch all courses for validation
-        // Fetch exams for each course
+        setCourses(data);
         for (const course of data) {
           const { data: examsData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${course.id}`);
           setExams(prev => ({ ...prev, [course.id]: examsData }));
         }
       } catch (error) {
-        console.log("Failed to fetch courses/exams for validation:", error.response?.data || error.message); // Log errors for debugging
+        console.log("Failed to fetch courses/exams:", error.response?.data || error.message);
       }
     };
     fetchCourses();
   }, []);
 
-  console.log("Admin component rendered at path:", location.pathname); // Log current path for debugging and maintenance
+  console.log("Admin component rendered at path:", location.pathname);
 
   const addQuestion = () => {
     setExamForm(prev => ({
@@ -53,9 +53,9 @@ export default function Admin() {
   const updateQuestion = (index, field, value) => {
     const newQuestions = [...examForm.questions];
     if (field === "options") {
-      newQuestions[index].options = value.split("\n").slice(0, 4); // Limit to 4 options per MCQ
+      newQuestions[index].options = value.split("\n").slice(0, 4);
     } else {
-      newQuestions[index][field] = value; // Update other fields (question, correctAnswer)
+      newQuestions[index][field] = value;
     }
     setExamForm({ ...examForm, questions: newQuestions });
   };
@@ -64,34 +64,31 @@ export default function Admin() {
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-course`, courseForm);
       alert("Course added!");
-      // Refresh courses after adding
       const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
       setCourses(data);
     } catch (error) {
-      console.log("Course upload error:", error.response?.data || error.message); // Log errors for debugging
+      console.log("Course upload error:", error.response?.data || error.message);
       alert("Failed to add course: " + (error.response?.data?.error || error.message));
     }
   };
 
   const handleExamSubmit = async () => {
     if (!courses.some(c => c.id === parseInt(examForm.courseId))) {
-      alert("Invalid Course ID. Please select an existing course.");
+      alert("Invalid Course ID.");
       return;
     }
     try {
-      // Wrap questions in the expected format: {"questions": [...]}
       const formattedExam = {
         name: examForm.name,
-        questions: { questions: examForm.questions }, // Wrap in object
+        questions: { questions: examForm.questions },
         email: examForm.email
       };
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-exam/${examForm.courseId}`, formattedExam);
       alert("Exam added!");
-      // Refresh exams for this course
       const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${examForm.courseId}`);
       setExams(prev => ({ ...prev, [examForm.courseId]: data }));
     } catch (error) {
-      console.log("Exam upload error:", error.response?.data || error.message); // Log errors for debugging
+      console.log("Exam upload error:", error.response?.data || error.message);
       alert("Failed to add exam: " + (error.response?.data?.error || error.message));
     }
   };
@@ -107,18 +104,36 @@ export default function Admin() {
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData);
       alert("Courses uploaded!");
-      // Refresh courses after file upload
       const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
       setCourses(data);
     } catch (error) {
-      console.log("File upload error:", error.response?.data || error.message); // Log errors for debugging
+      console.log("File upload error:", error.response?.data || error.message);
       alert("Failed to upload file: " + (error.response?.data?.error || error.message));
     }
   };
 
-  // Redirect invalid admin paths to /admin/courses for consistency
+  const handleMaterialUpload = async (courseId) => {
+    if (!materialFile) {
+      alert("Please select a PDF file first!");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", materialFile);
+    formData.append("courseId", courseId); // Link to specific course
+    try {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      alert("Material uploaded successfully!");
+      // Optionally update course materials (fetch new data if needed)
+    } catch (error) {
+      console.log("Material upload error:", error.response?.data || error.message);
+      alert("Failed to upload material: " + (error.response?.data?.error || error.message));
+    }
+  };
+
   if (!location.pathname.startsWith("/admin")) {
-    console.log("Invalid admin path detected, redirecting to /admin/courses"); // Log path issue for troubleshooting
+    console.log("Invalid admin path detected, redirecting to /admin/courses");
     return <Navigate to="/admin/courses" replace />;
   }
 
@@ -148,12 +163,25 @@ export default function Admin() {
               <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
               <button onClick={handleFileUpload} className="bg-purple-500 text-white p-2 rounded">Upload Excel File</button>
             </div>
+            <div className="mt-4">
+              <h3 className="text-lg font-semibold">Upload Course Material (PDF)</h3>
+              <select className="border p-2 m-2 w-full rounded" onChange={(e) => {
+                // Pre-select course for material upload (optional)
+              }}>
+                <option value="">Select Course</option>
+                {courses.map(course => (
+                  <option key={course.id} value={course.id}>{course.title} (ID: {course.id})</option>
+                ))}
+              </select>
+              <input type="file" accept="application/pdf" onChange={(e) => setMaterialFile(e.target.files[0])} className="m-2" />
+              <button onClick={() => handleMaterialUpload(courses.find(c => c.id === parseInt(document.querySelector("select").value))?.id || "")} className="bg-blue-500 text-white p-2 rounded">Upload PDF</button>
+            </div>
             {courses.length > 0 && (
               <div className="mt-4">
                 <h3 className="text-lg font-semibold">Existing Courses</h3>
                 {courses.map(course => (
                   <div key={course.id} className="border p-2 rounded mt-2">
-                    {course.title} (ID: {course.id}) - Exams: {exams[course.id]?.length || 0}
+                    {course.title} (ID: {course.id}) - Exams: {exams[course.id]?.length || 0} - Materials: {course.materials ? "Yes" : "No"}
                   </div>
                 ))}
               </div>

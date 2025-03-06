@@ -3,6 +3,11 @@ const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 const XLSX = require("xlsx");
 const fs = require("fs");
+const router = express.Router();
+const { supabase } = require("../config/supabase"); // Assuming supabase config
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() }); // Use memory storage for Supabase
+
 
 module.exports = (upload) => { // Accept upload as param
   const router = express.Router();
@@ -108,6 +113,39 @@ module.exports = (upload) => { // Accept upload as param
     const { data, error } = await supabase.from("courses").select("*");
     if (error) return res.status(400).json({ error: error.message }); // Handle fetch errors
     res.json(data);
+  });
+
+    // Upload course or material file (e.g., PDF)
+  router.post("/upload-file", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const file = req.file;
+      const courseId = req.body.courseId || req.body.email; // Add courseId to identify material
+      const fileName = `${courseId}/${Date.now()}_${file.originalname}`;
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from("course-materials")
+        .upload(fileName, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      // Store metadata in courses table (optional)
+      await supabase.from("courses").update({
+        materials: supabase.storage.from("course-materials").getPublicUrl(fileName).data.publicUrl,
+      }).eq("id", courseId);
+
+      res.json({ message: "File uploaded successfully", url: supabase.storage.from("course-materials").getPublicUrl(fileName).data.publicUrl });
+    } catch (error) {
+      console.error("Upload error:", error.message);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
   });
 
 
