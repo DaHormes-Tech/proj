@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect } from "react";
 import { Link, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import axios from "axios";
 
@@ -79,11 +79,13 @@ export default function Admin() {
       return;
     }
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-exam/${examForm.courseId}`, {
+      // Wrap questions in the expected format: {"questions": [...]}
+      const formattedExam = {
         name: examForm.name,
-        questions: examForm.questions,
+        questions: { questions: examForm.questions }, // Wrap in object
         email: examForm.email
-      });
+      };
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-exam/${examForm.courseId}`, formattedExam);
       alert("Exam added!");
       // Refresh exams for this course
       const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${examForm.courseId}`);
