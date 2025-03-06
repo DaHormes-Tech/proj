@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react"; // Added useEffect for fetching courses
+import { useState, useEffect } from "react"; // Added useEffect
 import { Link, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import axios from "axios";
 
@@ -20,7 +20,8 @@ export default function Admin() {
     email: "admin@uniben.edu"
   });
   const [file, setFile] = useState(null);
-  const [courses, setCourses] = useState([]); // Store available courses for dropdown
+  const [courses, setCourses] = useState([]); // Store available courses
+  const [exams, setExams] = useState({}); // Store exams by courseId
   const location = useLocation(); // Track current URL for debugging
 
   useEffect(() => {
@@ -28,8 +29,13 @@ export default function Admin() {
       try {
         const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
         setCourses(data); // Fetch all courses for validation
+        // Fetch exams for each course
+        for (const course of data) {
+          const { data: examsData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${course.id}`);
+          setExams(prev => ({ ...prev, [course.id]: examsData }));
+        }
       } catch (error) {
-        console.log("Failed to fetch courses for validation:", error.response?.data || error.message); // Log errors for debugging
+        console.log("Failed to fetch courses/exams for validation:", error.response?.data || error.message); // Log errors for debugging
       }
     };
     fetchCourses();
@@ -58,6 +64,9 @@ export default function Admin() {
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-course`, courseForm);
       alert("Course added!");
+      // Refresh courses after adding
+      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      setCourses(data);
     } catch (error) {
       console.log("Course upload error:", error.response?.data || error.message); // Log errors for debugging
       alert("Failed to add course: " + (error.response?.data?.error || error.message));
@@ -76,6 +85,9 @@ export default function Admin() {
         email: examForm.email
       });
       alert("Exam added!");
+      // Refresh exams for this course
+      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${examForm.courseId}`);
+      setExams(prev => ({ ...prev, [examForm.courseId]: data }));
     } catch (error) {
       console.log("Exam upload error:", error.response?.data || error.message); // Log errors for debugging
       alert("Failed to add exam: " + (error.response?.data?.error || error.message));
@@ -93,6 +105,9 @@ export default function Admin() {
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData);
       alert("Courses uploaded!");
+      // Refresh courses after file upload
+      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      setCourses(data);
     } catch (error) {
       console.log("File upload error:", error.response?.data || error.message); // Log errors for debugging
       alert("Failed to upload file: " + (error.response?.data?.error || error.message));
@@ -131,6 +146,16 @@ export default function Admin() {
               <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
               <button onClick={handleFileUpload} className="bg-purple-500 text-white p-2 rounded">Upload Excel File</button>
             </div>
+            {courses.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold">Existing Courses</h3>
+                {courses.map(course => (
+                  <div key={course.id} className="border p-2 rounded mt-2">
+                    {course.title} (ID: {course.id}) - Exams: {exams[course.id]?.length || 0}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         } />
         <Route path="exams" element={
@@ -153,6 +178,16 @@ export default function Admin() {
             ))}
             <button onClick={addQuestion} className="bg-blue-500 text-white p-2 rounded mt-2">Add Question</button>
             <button onClick={handleExamSubmit} className="bg-green-500 text-white p-2 rounded mt-2">Upload Exam</button>
+            {examForm.courseId && exams[examForm.courseId] && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold">Existing Exams for Course {examForm.courseId}</h3>
+                {exams[examForm.courseId].map(exam => (
+                  <div key={exam.id} className="border p-2 rounded mt-2">
+                    {exam.name} (ID: {exam.id})
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         } />
       </Routes>
