@@ -5,6 +5,7 @@ import axios from "axios";
 import CourseCard from "../components/CourseCard";
 import { Link } from "react-router-dom";
 
+// Courses list component for users, displaying courses and linking to exams
 export default function Courses() {
   const [courses, setCourses] = useState([]);
   const [search, setSearch] = useState("");
@@ -14,17 +15,17 @@ export default function Courses() {
     const fetchCourses = async () => {
       try {
         const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
-        console.log("Fetched courses from API:", data); // Debug log
+        console.log("Fetched courses from API:", data); // Debug log for courses
         const parsedCourses = data.map(course => ({
           ...course,
-          qa: { questions: [] } //Remove qa from courses, handled by exams
+          qa: { questions: [] } // Remove qa from courses, handled by exams
         }));
         await syncCourses(parsedCourses);
         const offlineCourses = await db.courses.toArray();
         setCourses(offlineCourses);
-        setError("" );
+        setError("");
       } catch (error) {
-        console.log("Fetch error:", error.response?.data || error.message);
+        console.log("Fetch error:", error.response?.data || error.message); // Log fetch errors
         setError("Failed to load courses. Showing offline data if available.");
         const offlineCourses = await db.courses.toArray();
         setCourses(offlineCourses);
@@ -53,7 +54,6 @@ export default function Courses() {
       )}
     </div>
   );
-  
 }
  
 /*
