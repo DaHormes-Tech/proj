@@ -5,33 +5,42 @@ import axios from "axios";
 import CourseCard from "../components/CourseCard";
 import { Link } from "react-router-dom";
 
-// Courses list component for users, displaying courses and linking to exams
+// Courses list component for users, displaying courses and linking to exams/details
 export default function Courses() {
   const [courses, setCourses] = useState([]);
+  const [exams, setExams] = useState({}); // Store exams by courseId
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
-        console.log("Fetched courses from API:", data); // Debug log for courses
-        const parsedCourses = data.map(course => ({
+        const { data: courseData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+        console.log("Fetched courses from API:", courseData); // Debug log for courses
+        const parsedCourses = courseData.map(course => ({
           ...course,
           qa: { questions: [] } // Remove qa from courses, handled by exams
         }));
         await syncCourses(parsedCourses);
         const offlineCourses = await db.courses.toArray();
         setCourses(offlineCourses);
+
+        // Fetch exams for each course
+        const examsData = {};
+        for (const course of offlineCourses) {
+          const { data: examData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${course.id}`);
+          examsData[course.id] = examData;
+        }
+        setExams(examsData);
         setError("");
       } catch (error) {
         console.log("Fetch error:", error.response?.data || error.message); // Log fetch errors
-        setError("Failed to load courses. Showing offline data if available.");
+        setError("Failed to load courses/exams. Showing offline data if available.");
         const offlineCourses = await db.courses.toArray();
         setCourses(offlineCourses);
       }
     };
-    fetchCourses();
+    fetchData();
   }, []);
 
   const filteredCourses = courses.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
@@ -44,9 +53,24 @@ export default function Courses() {
         filteredCourses.map(course => (
           <div key={course.id} className="mb-4">
             <CourseCard course={course} />
-            <Link to={`/courses/${course.id}/exam/1`} className="bg-blue-500 text-white p-2 rounded mt-2 block w-full text-center hover:bg-blue-600">
-              Take Exam 1
+            <Link to={`/courses/${course.id}`} className="bg-blue-500 text-white p-2 rounded mt-2 block w-full text-center hover:bg-blue-600">
+              View Course Details
             </Link>
+            <div className="mt-2">
+              {exams[course.id] && exams[course.id].length > 0 ? (
+                <div className="mt-2">
+                  <button className="bg-green-500 text-white p-2 rounded mr-2 hover:bg-green-600">Take Exam</button>
+                  <select className="border p-2 rounded" onChange={(e) => window.location.href = `/courses/${course.id}/exam/${e.target.value}`}>
+                    <option value="">Select Exam</option>
+                    {exams[course.id].map(exam => (
+                      <option key={exam.id} value={exam.id}>{exam.name}</option> // Use exam.id instead of name
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-gray-500 mt-2">No Exams available</p>
+              )}
+            </div>
           </div>
         ))
       ) : (

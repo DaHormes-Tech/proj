@@ -19,13 +19,15 @@ export default function Exam() {
         console.log(`Fetching exam for course ${courseId}, exam ${examId}`); // Debug: Log fetch attempt
         const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${courseId}`);
         console.log("Exam data response:", data); // Debug: Log API response
-        // Try to match by name (e.g., "Exam 3") or ID if numeric
+        // Match by ID (numeric)
         const numericExamId = parseInt(examId);
-        const selectedExam = data.find(e =>
-          e.id === numericExamId || e.name === `Exam ${examId}` || e.name === examId // Match by ID, "Exam X", or plain "X"
-        );
-        if (!selectedExam || !selectedExam.questions || !selectedExam.questions.questions || selectedExam.questions.questions.length === 0) {
-          setError("Exam not found or no questions available.");
+        const selectedExam = data.find(e => e.id === numericExamId);
+        if (!selectedExam) {
+          setError("Exam not found.");
+          return;
+        }
+        if (!selectedExam.questions || !selectedExam.questions.questions || selectedExam.questions.questions.length === 0) {
+          setError("No questions available for this exam.");
           return;
         }
         // Shuffle questions and options for freshness
