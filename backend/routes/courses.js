@@ -115,16 +115,22 @@ module.exports = (upload) => { // Accept upload as param
     res.json(data);
   });
 
-    // Upload course or material file (e.g., PDF)
-  router.post("/upload-file", upload.single("file"), async (req, res) => {
+    
+  // Upload course or material file (e.g., PDF)
+  router.post("/upload-file", isAdmin, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
       const file = req.file;
-      const courseId = req.body.courseId || req.body.email; // Add courseId to identify material
+      const courseId = req.body.courseId; // Ensure courseId is sent
+      if (!courseId) {
+        return res.status(400).json({ error: "Course ID is required" });
+      }
+
       const fileName = `${courseId}/${Date.now()}_${file.originalname}`;
+      console.log(`Uploading file: ${fileName} for course ${courseId}`); // Debug log
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -134,17 +140,21 @@ module.exports = (upload) => { // Accept upload as param
           upsert: true,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase Storage error:", error.message);
+        throw error;
+      }
 
-      // Store metadata in courses table (optional)
+      // Store metadata in courses table
+      const publicUrl = supabase.storage.from("course-materials").getPublicUrl(fileName).data.publicUrl;
       await supabase.from("courses").update({
-        materials: supabase.storage.from("course-materials").getPublicUrl(fileName).data.publicUrl,
+        materials: publicUrl, // Update or append to materials field
       }).eq("id", courseId);
 
-      res.json({ message: "File uploaded successfully", url: supabase.storage.from("course-materials").getPublicUrl(fileName).data.publicUrl });
+      res.json({ message: "File uploaded successfully", url: publicUrl });
     } catch (error) {
       console.error("Upload error:", error.message);
-      res.status(500).json({ error: "Failed to upload file" });
+      res.status(500).json({ error: "Failed to upload material: " + error.message });
     }
   });
 
