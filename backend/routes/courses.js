@@ -117,7 +117,7 @@ module.exports = (upload) => { // Accept upload as param
 
 
   // Upload course or material file (e.g., PDF)
-  router.post("/upload-file", isAdmin, upload.single("file"), async (req, res) => {
+  router.post("/upload-file", checkAdmin, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -138,6 +138,7 @@ module.exports = (upload) => { // Accept upload as param
       const fileName = `${numericCourseId}/${Date.now()}_${file.originalname}`;
 
       // Upload to Supabase Storage
+      console.log("Uploading to Supabase Storage...");
       const { data: storageData, error: storageError } = await supabase.storage
         .from("course-materials")
         .upload(fileName, file.buffer, {
@@ -149,9 +150,10 @@ module.exports = (upload) => { // Accept upload as param
         console.error("Supabase Storage error:", storageError.message);
         throw storageError;
       }
+      console.log("Storage upload successful, public URL generating...");
 
       // Verify course exists and fetch current data
-      console.log(`Fetching course with ID ${numericCourseId}`); // Debug log
+      console.log(`Fetching course with ID ${numericCourseId}...`);
       const { data: courseData, error: courseError } = await supabase
         .from("courses")
         .select("id, title, materials")
@@ -164,7 +166,7 @@ module.exports = (upload) => { // Accept upload as param
       }
 
       if (!courseData) {
-        console.error(`Course with ID ${numericCourseId} not found`);
+        console.error(`Course with ID ${numericCourseId} not found in fetched data`);
         return res.status(404).json({ error: `Course with ID ${numericCourseId} not found` });
       }
 
@@ -182,14 +184,14 @@ module.exports = (upload) => { // Accept upload as param
         .eq("id", numericCourseId);
 
       if (updateError) {
-        console.error("Update error:", updateError.message);
+        console.error("Update error details:", updateError.message, updateError.code, updateError.details);
         throw updateError;
       }
 
-      console.log(`Successfully updated course ${numericCourseId} with new material URL`); // Debug log
+      console.log(`Successfully updated course ${numericCourseId} with new material URL`);
       res.json({ message: "File uploaded successfully", url: publicUrl });
     } catch (error) {
-      console.error("Upload error:", error.message);
+      console.error("Upload error:", error.message, error.stack); // Include stack trace
       res.status(500).json({ error: "Failed to upload material: " + error.message });
     }
   });
