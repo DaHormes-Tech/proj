@@ -117,15 +117,23 @@ export default function Admin() {
       alert("Please select a PDF file first!");
       return;
     }
+    const selectedCourseId = document.querySelector("select").value; // Get selected courseId
+    if (!selectedCourseId || isNaN(parseInt(selectedCourseId)) || parseInt(selectedCourseId) <= 0) {
+      alert("Please select a valid course!");
+      return;
+    }
     const formData = new FormData();
     formData.append("file", materialFile);
     formData.append("courseId", courseId); // Link to specific course
+    formData.append("email", "admin@uniben.edu"); // Add admin email for validation
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       alert("Material uploaded successfully!");
       // Optionally update course materials (fetch new data if needed)
+      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      setCourses(data); 
     } catch (error) {
       console.log("Material upload error:", error.response?.data || error.message);
       alert("Failed to upload material: " + (error.response?.data?.error || error.message));

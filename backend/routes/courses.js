@@ -116,47 +116,67 @@ module.exports = (upload) => { // Accept upload as param
   });
 
     
-  // Upload course or material file (e.g., PDF)
-  router.post("/upload-file", isAdmin, upload.single("file"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      const file = req.file;
-      const courseId = req.body.courseId; // Ensure courseId is sent
-      if (!courseId) {
-        return res.status(400).json({ error: "Course ID is required" });
-      }
-
-      const fileName = `${courseId}/${Date.now()}_${file.originalname}`;
-      console.log(`Uploading file: ${fileName} for course ${courseId}`); // Debug log
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from("course-materials")
-        .upload(fileName, file.buffer, {
-          contentType: file.mimetype,
-          upsert: true,
-        });
-
-      if (error) {
-        console.error("Supabase Storage error:", error.message);
-        throw error;
-      }
-
-      // Store metadata in courses table
-      const publicUrl = supabase.storage.from("course-materials").getPublicUrl(fileName).data.publicUrl;
-      await supabase.from("courses").update({
-        materials: publicUrl, // Update or append to materials field
-      }).eq("id", courseId);
-
-      res.json({ message: "File uploaded successfully", url: publicUrl });
-    } catch (error) {
-      console.error("Upload error:", error.message);
-      res.status(500).json({ error: "Failed to upload material: " + error.message });
+// Upload course or material file (e.g., PDF)
+router.post("/upload-file", isAdmin, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
     }
-  });
+
+    const file = req.file;
+    const courseId = req.body.courseId; // Ensure courseId is sent
+    if (!courseId || isNaN(parseInt(courseId)) || parseInt(courseId) <= 0) {
+      return res.status(400).json({ error: "Valid Course ID is required" });
+    }
+
+    const numericCourseId = parseInt(courseId);
+    console.log(`Uploading file for course ${numericCourseId}`); // Debug log
+    console.log("Request body:", req.body); // Debug full request body
+    console.log("File:", file); // Debug file details
+
+
+    const fileName = `${numericCourseId}/${Date.now()}_${file.originalname}`;
+    console.log(`Uploading file: ${fileName} for course ${courseId}`); // Debug log
+
+    // Upload to Supabase Storage
+    const { data, error: storageError } = await supabase.storage
+      .from("course-materials")
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (storageError) {
+      console.error("Supabase Storage error:", storageError.message);
+      throw storageError;
+    }
+
+    // Store metadata in courses table
+    const publicUrl = supabase.storage.from("course-materials").getPublicUrl(fileName).data.publicUrl;
+    //await supabase.from("courses").update({
+     // materials: publicUrl, // Update or append to materials field
+    //}).eq("id", courseId);
+
+    const updatedMaterials = courseData.materials ? [...courseData.materials, publicUrl] : [publicUrl];
+    const { error: updateError } = await supabase
+      .from("courses")
+      .update({
+        materials: updatedMaterials, // Update materials as an array
+        title: courseData.title, // Include title to satisfy NOT NULL constraint
+      })
+      .eq("id", numericCourseId);
+
+    if (updateError) {
+      console.error("Update error:", updateError.message);
+      throw updateError;
+    }
+
+    res.json({ message: "File uploaded successfully", url: publicUrl });
+  } catch (error) {
+    console.error("Upload error:", error.message);
+    res.status(500).json({ error: "Failed to upload material: " + error.message });
+  }
+});
 
 
   // Add exam for a course (admin only)
