@@ -23,6 +23,7 @@ export default function Admin() {
   const [materialFile, setMaterialFile] = useState(null); // For material (PDF) upload
   const [courses, setCourses] = useState([]);
   const [exams, setExams] = useState({});
+  const [selectedCourseId, setSelectedCourseId] = useState(""); // Track selected courseId
   const location = useLocation();
 
   useEffect(() => {
@@ -112,28 +113,27 @@ export default function Admin() {
     }
   };
 
-  const handleMaterialUpload = async (courseId) => {
+  const handleMaterialUpload = async () => {
     if (!materialFile) {
       alert("Please select a PDF file first!");
       return;
     }
-    const selectedCourseId = document.querySelector("select").value; // Get selected courseId
+    console.log("Selected Course ID from state:", selectedCourseId); // Debug log
     if (!selectedCourseId || isNaN(parseInt(selectedCourseId)) || parseInt(selectedCourseId) <= 0) {
       alert("Please select a valid course!");
       return;
     }
     const formData = new FormData();
     formData.append("file", materialFile);
-    formData.append("courseId", courseId); // Link to specific course
-    formData.append("email", "admin@uniben.edu"); // Add admin email for validation
+    formData.append("courseId", selectedCourseId);
+    formData.append("email", "admin@uniben.edu");
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       alert("Material uploaded successfully!");
-      // Optionally update course materials (fetch new data if needed)
       const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
-      setCourses(data); 
+      setCourses(data); // Refresh courses to update materials
     } catch (error) {
       console.log("Material upload error:", error.response?.data || error.message);
       alert("Failed to upload material: " + (error.response?.data?.error || error.message));
@@ -173,16 +173,18 @@ export default function Admin() {
             </div>
             <div className="mt-4">
               <h3 className="text-lg font-semibold">Upload Course Material (PDF)</h3>
-              <select className="border p-2 m-2 w-full rounded" onChange={(e) => {
-                // Pre-select course for material upload (optional)
-              }}>
+              <select
+                className="border p-2 m-2 w-full rounded"
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(e.target.value)}
+              >
                 <option value="">Select Course</option>
                 {courses.map(course => (
                   <option key={course.id} value={course.id}>{course.title} (ID: {course.id})</option>
                 ))}
               </select>
               <input type="file" accept="application/pdf" onChange={(e) => setMaterialFile(e.target.files[0])} className="m-2" />
-              <button onClick={() => handleMaterialUpload(courses.find(c => c.id === parseInt(document.querySelector("select").value))?.id || "")} className="bg-blue-500 text-white p-2 rounded">Upload PDF</button>
+              <button onClick={handleMaterialUpload} className="bg-blue-500 text-white p-2 rounded">Upload PDF</button>
             </div>
             {courses.length > 0 && (
               <div className="mt-4">
