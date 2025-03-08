@@ -116,8 +116,9 @@ module.exports = (upload) => { // Accept upload as param
   });
 
 
+    
   // Upload course or material file (e.g., PDF)
-  router.post("/upload-file", checkAdmin, upload.single("file"), async (req, res) => {
+  router.post("/upload-file", isAdmin, upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -195,8 +196,6 @@ module.exports = (upload) => { // Accept upload as param
       res.status(500).json({ error: "Failed to upload material: " + error.message });
     }
   });
-
-
 
   // Add exam for a course (admin only)
   router.post("/add-exam/:courseId", isAdmin, async (req, res) => {
