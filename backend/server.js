@@ -25,11 +25,11 @@ app.use(express.urlencoded({ extended: true })); // For form-data parsing
 
 const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payment");
-const courseRoutes = require("./routes/courses")(upload); //Pass upload here
+const courseRouter = require("./routes/courses"); //Pass upload here
 
 app.use("/api/auth", authRoutes);
 app.use("/api/payment", paymentRoutes);
-app.use("/api/courses", courseRoutes);
+app.use("/api/courses", courseRouter);
 
 app.get("/", (req, res) => res.send("EdTeech API running"));
 
