@@ -1,71 +1,3 @@
-
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import axios from "axios";
-
-export default function Course() {
-  const { id } = useParams();
-  const [course, setCourse] = useState(null);
-
-  const fetchCourse = async (retries = 3, delay = 2000) => {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`, { timeout: 30000 });
-        const courseData = data.find(c => c.id === parseInt(id));
-        if (courseData && (!courseData.materials || courseData.materials.length === 0)) {
-          console.warn("No materials found, retrying...");
-          if (attempt === retries) throw new Error("No materials available after retries");
-          await new Promise(resolve => setTimeout(resolve, delay * attempt));
-          continue;
-        }
-        setCourse(courseData);
-        return;
-      } catch (error) {
-        console.error(`Fetch attempt ${attempt} failed:`, error.message);
-        if (attempt === retries) {
-          setCourse({ id: parseInt(id), title: "Error", full_summary: "Failed to load course details." });
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, delay * attempt));
-      }
-    }
-  };
-
-  useEffect(() => {
-    fetchCourse();
-  }, [id]);
-
-  if (!course) return <div>Loading...</div>;
-
-  return (
-    <div className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">{course.title}</h1>
-      <p className="mb-4">{course.full_summary}</p>
-      {course.materials && course.materials.length > 0 ? (
-        <div>
-          <h2 className="text-xl font-semibold mb-2">Course Materials</h2>
-          {course.materials.map((url, index) => (
-            <div key={index} className="mb-4">
-              <iframe
-                src={url}
-                title={`Course Material ${index + 1}`}
-                className="w-full h-96 border"
-                onError={(e) => console.log("Iframe error:", e)}
-              />
-              <a href={url} download className="text-blue-500 hover:underline">
-                Download PDF
-              </a>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p>No materials available.</p>
-      )}
-    </div>
-  );
-}
-
-/*
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
@@ -78,26 +10,48 @@ export default function CourseDetails() {
   const [materialUrl, setMaterialUrl] = useState(null); // Store PDF URL
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async (retries = 3, delay = 2000) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const { data: courseData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+        console.log(`Fetching data for course ID ${courseId}, attempt ${attempt}`);
+        // Fetch course data
+        const { data: courseData } = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/courses/list`,
+          { timeout: 30000 } // 30-second timeout
+        );
         const selectedCourse = courseData.find(c => c.id === parseInt(courseId));
         if (!selectedCourse) {
-          setError("Course not found.");
-          return;
+          console.warn(`Course with ID ${courseId} not found, attempt ${attempt}`);
+          if (attempt === retries) throw new Error("Course not found");
+          await new Promise(resolve => setTimeout(resolve, delay * attempt));
+          continue;
         }
         setCourse(selectedCourse);
-        setMaterialUrl(selectedCourse.materials || null); // Fetch material URL from course
+        setMaterialUrl(selectedCourse.materials && selectedCourse.materials.length > 0 ? selectedCourse.materials[0] : null);
 
-        const { data: examData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${courseId}`);
-        setExams(examData);
+        // Fetch exam data
+        const { data: examData } = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/courses/exams/${courseId}`,
+          { timeout: 30000 } // 30-second timeout
+        );
+        setExams(examData || []);
         setError("");
+        return;
       } catch (error) {
-        console.log("Fetch error:", error.response?.data || error.message); // Log fetch errors
-        setError("Failed to load course details or exams.");
+        console.error(`Fetch attempt ${attempt} failed:`, error.message);
+        if (attempt === retries) {
+          setError("Failed to load course details or exams.");
+          setCourse({ id: parseInt(courseId), title: "Error", full_summary: "Failed to load course details." });
+          setExams([]);
+          setMaterialUrl(null);
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay * attempt));
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [courseId]);
 
@@ -147,5 +101,3 @@ export default function CourseDetails() {
     </div>
   );
 }
-
-*/

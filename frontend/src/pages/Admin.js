@@ -113,6 +113,10 @@ export default function Admin() {
     }
   };
 
+  const handleCourseSelect = (e) => {
+    setSelectedCourseId(parseInt(e.target.value));
+  };
+
   const handleMaterialUpload = async () => {
     if (!materialFile) {
       alert("Please select a PDF file first!");
@@ -125,7 +129,7 @@ export default function Admin() {
     }
     const formData = new FormData();
     formData.append("file", materialFile);
-    formData.append("courseId", selectedCourse.toString()); // Ensure string
+    formData.append("courseId", selectedCourseId.toString()); // Ensure string
     formData.append("email", "admin@uniben.edu");
     console.log("FormData contents:", Array.from(formData.entries())); // Debug log
     try {
