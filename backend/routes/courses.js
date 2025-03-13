@@ -2,18 +2,21 @@
 console.log("Loading routes/courses.js..."); // Debug to confirm file is loaded
 
 const express = require("express");
-const { supabase } = require("../config/supabase"); // Use global supabase config
+//const { supabase } = require("../config/supabase"); // Use global supabase config
 const multer = require("multer");
+const { supabase } = require("../supabaseClient", "../config/supabase");
 const upload = multer({ storage: multer.memoryStorage() }); // Use memory storage for Supabase
-
+const XLSX = require("xlsx"); // For parsing Excel files
 const router = express.Router();
 
 // Middleware to check admin access
 const isAdmin = (req, res, next) => {
   console.log("Request body after multer:", req.body); // Debug log
-  const { email } = req.body;
+  const email = req.body.email || req.query.email || (req.auth && req.auth.user && req.auth.user.email);
+  console.log("Checking admin access for email:", email);
+
   if (email !== "admin@uniben.edu") {
-    return res.status(403).json({ error: "Admin access only" });
+    return res.status(403).json({ error: "Unauthorized: Admin access only" });
   }
   next();
 };
@@ -73,6 +76,7 @@ router.get("/exams/:courseId", async (req, res) => {
 router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => {
   try {
     console.log("Handling /upload-file route..."); // Debug to confirm route is hit
+    console.log("Request body after Multer:", req.body); // Debug log
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
@@ -80,6 +84,9 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
     const file = req.file;
     const courseId = req.body.courseId;
     console.log("Received courseId:", courseId); // Debug log for incoming courseId
+    console.log("Full request body:", req.body);
+    console.log("File details:", file);
+
     if (!courseId || isNaN(parseInt(courseId)) || parseInt(courseId) <= 0) {
       return res.status(400).json({ error: "Valid Course ID is required" });
     }
@@ -196,5 +203,100 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
     res.status(500).json({ error: "Failed to upload material: " + error.message });
   }
 });
+
+
+// Upload exam questions via Excel
+router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => {
+  try {
+    console.log("Handling /upload-exam route...");
+    console.log("Request body after Multer:", req.body);
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const file = req.file;
+    const courseId = req.body.courseId;
+    const examName = req.body.examName;
+    console.log("Received courseId:", courseId);
+    console.log("Received examName:", examName);
+    console.log("Full request body:", req.body);
+    console.log("File details:", file);
+
+    if (!courseId || isNaN(parseInt(courseId)) || parseInt(courseId) <= 0) {
+      return res.status(400).json({ error: "Valid Course ID is required" });
+    }
+    if (!examName || typeof examName !== "string" || examName.trim() === "") {
+      return res.status(400).json({ error: "Valid exam name is required" });
+    }
+
+    const numericCourseId = parseInt(courseId);
+
+    // Parse Excel file
+    const workbook = XLSX.read(file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(sheet);
+    console.log("Parsed Excel data:", jsonData);
+
+    // Validate and transform Excel data into questions format
+    const questions = jsonData.map(row => {
+      if (!row.question || !row.options || !row.correctAnswer) {
+        throw new Error("Excel file must have 'question', 'options', and 'correctAnswer' columns");
+      }
+      // Options should be a comma-separated string in Excel, e.g., "Protein,Gene,Sugar,Fat"
+      const options = row.options.split(",").map(opt => opt.trim());
+      if (options.length < 2) {
+        throw new Error("Each question must have at least 2 options");
+      }
+      if (!options.includes(row.correctAnswer)) {
+        throw new Error("Correct answer must be one of the options");
+      }
+      return {
+        question: row.question,
+        options,
+        correctAnswer: row.correctAnswer,
+      };
+    });
+
+    // Check if exam exists, create or update
+    const { data: existingExam, error: fetchError } = await supabase
+      .from("exams")
+      .select("id, course_id, name, questions")
+      .eq("course_id", numericCourseId)
+      .eq("name", examName)
+      .single();
+
+    let examData;
+    if (fetchError && fetchError.code !== "PGRST116") {
+      console.error("Exam fetch error:", fetchError.message);
+      throw fetchError;
+    }
+
+    if (existingExam) {
+      const updatedQuestions = existingExam.questions ? [...existingExam.questions, ...questions] : questions;
+      const { data: updateData, error: updateError } = await supabase
+        .from("exams")
+        .update({ questions: updatedQuestions })
+        .eq("id", existingExam.id)
+        .select();
+      if (updateError) throw updateError;
+      examData = updateData[0];
+    } else {
+      const { data: insertData, error: insertError } = await supabase
+        .from("exams")
+        .insert({ course_id: numericCourseId, name: examName, questions })
+        .select();
+      if (insertError) throw insertError;
+      examData = insertData[0];
+    }
+
+    console.log(`Successfully updated/created exam for course ${numericCourseId}`, examData);
+    res.json({ message: "Exam questions uploaded successfully", examId: examData.id });
+  } catch (error) {
+    console.error("Upload error:", error.message);
+    res.status(500).json({ error: "Failed to upload exam questions: " + error.message });
+  }
+});
+
 
 module.exports = router; // Export the router directly

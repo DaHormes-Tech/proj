@@ -23,9 +23,13 @@ export default function Admin() {
   const [materialFile, setMaterialFile] = useState(null); // For material (PDF) upload
   const [courses, setCourses] = useState([]);
   const [exams, setExams] = useState({});
-  const [selectedCourseId, setSelectedCourseId] = useState(""); // Track selected courseId
+  const [selectedCourseId, setSelectedCourseId] = useState(null); // Track selected courseId
   const location = useLocation();
+  const [selectedExamCourseId, setSelectedExamCourseId] = useState(null); // Track selected course for exams
+  const [examName, setExamName] = useState(""); // Track exam name
+  const [examFile, setExamFile] = useState(null);
 
+  // Fetch all courses on component mount
   useEffect(() => {
     const fetchCourses = async () => {
       try {
@@ -113,9 +117,23 @@ export default function Admin() {
     }
   };
 
-  const handleCourseSelect = (e) => {
-    setSelectedCourseId(parseInt(e.target.value));
+    // Handle course selection from dropdown
+    const handleCourseSelect = (e) => {
+      setSelectedCourseId(parseInt(e.target.value));
+      console.log("Selected course ID for materials:", e.target.value);
+      //const courseId = parseInt(e.target.value);
+      //setSelectedCourseId(courseId);
+      //console.log("Selected course ID:", courseId); // Debug log
+    };
+
+  // Handle file selection for material upload
+  const handleFileChange = (e) => {
+    setMaterialFile(e.target.files[0]);
   };
+
+  //const handleCourseSelect = (e) => {
+   // setSelectedCourseId(parseInt(e.target.value));
+  //};
 
   const handleMaterialUpload = async () => {
     if (!materialFile) {
@@ -146,6 +164,62 @@ export default function Admin() {
     }
   };
 
+  
+
+  // Handle course selection for exams
+  const handleExamCourseSelect = (e) => {
+    setSelectedExamCourseId(parseInt(e.target.value));
+    console.log("Selected course ID for exam:", e.target.value);
+  };
+
+  // Handle exam name change
+  const handleExamNameChange = (e) => {
+    setExamName(e.target.value);
+  };
+
+  // Handle file selection for exam upload
+  const handleExamFileChange = (e) => {
+    setExamFile(e.target.files[0]);
+  };
+
+  // Handle exam upload
+  const handleExamUpload = async () => {
+    if (!examFile) {
+      alert("Please select an Excel file to upload!");
+      return;
+    }
+    if (!selectedExamCourseId || isNaN(selectedExamCourseId) || selectedExamCourseId <= 0) {
+      alert("Please select a valid course!");
+      return;
+    }
+    if (!examName || examName.trim() === "") {
+      alert("Please enter a valid exam name!");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", examFile);
+    formData.append("courseId", selectedExamCourseId.toString());
+    formData.append("examName", examName);
+    formData.append("email", "admin@uniben.edu");
+    console.log("FormData contents for exam:", Array.from(formData.entries()));
+
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/courses/upload-exam`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 60000,
+        }
+      );
+      alert("Exam file uploaded successfully!");
+      // Optionally refresh exam data if you have an endpoint for it
+    } catch (error) {
+      console.error("Exam upload error:", error.response?.data || error.message);
+      alert("Failed to upload exam file: " + (error.response?.data?.error || error.message));
+    }
+  };
+
   if (!location.pathname.startsWith("/admin")) {
     console.log("Invalid admin path detected, redirecting to /admin/courses");
     return <Navigate to="/admin/courses" replace />;
@@ -153,7 +227,7 @@ export default function Admin() {
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Admin Portal</h1>
+      <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
       <nav className="mb-4">
         <Link to="/admin/courses" className="mr-4 text-blue-500 hover:text-blue-700">Courses</Link>
         <Link to="/admin/exams" className="text-blue-500 hover:text-blue-700">Exams</Link>
@@ -177,6 +251,43 @@ export default function Admin() {
               <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
               <button onClick={handleFileUpload} className="bg-purple-500 text-white p-2 rounded">Upload Excel File</button>
             </div>
+            {/* Exam Upload Section */}
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold mb-2">Upload Exam File</h2>
+              <select
+                onChange={handleExamCourseSelect}
+                value={selectedExamCourseId || ""}
+                className="border p-2 mb-2 w-full"
+              >
+                <option value="">Select a course</option>
+                {courses.map(course => (
+                  <option key={course.id} value={course.id}>
+                    {course.title} (ID: {course.id})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Exam Name"
+                value={examName}
+                onChange={handleExamNameChange}
+                className="border p-2 mb-2 w-full"
+              />
+              <input
+                type="file"
+                accept=".xlsx,.xls" // Restrict to Excel files for exams
+                onChange={handleExamFileChange}
+                className="border p-2 mb-2 w-full"
+              />
+              <button
+                onClick={handleExamUpload}
+                className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
+              >
+                Upload Exam
+              </button>
+            </div>
+
+            {/* Course Upload Section */}
             <div className="mt-4">
               <h3 className="text-lg font-semibold">Upload Course Material (PDF)</h3>
               <select
@@ -240,6 +351,10 @@ export default function Admin() {
     </div>
   );
 }
+
+
+      
+
 
 /*
 import { useState } from "react";
