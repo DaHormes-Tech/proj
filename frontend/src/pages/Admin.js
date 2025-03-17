@@ -105,6 +105,7 @@ export default function Admin() {
     }
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("courseId", "1"); // Default or dynamic value from UI  
     formData.append("email", "admin@uniben.edu");
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData);
@@ -117,18 +118,19 @@ export default function Admin() {
     }
   };
 
-    // Handle course selection from dropdown
-    const handleCourseSelect = (e) => {
-      setSelectedCourseId(parseInt(e.target.value));
-      console.log("Selected course ID for materials:", e.target.value);
-      //const courseId = parseInt(e.target.value);
-      //setSelectedCourseId(courseId);
-      //console.log("Selected course ID:", courseId); // Debug log
-    };
+  // Handle course selection from dropdown
+  const handleCourseSelect = (e) => {
+    setSelectedCourseId(parseInt(e.target.value));
+    console.log("Selected course ID for materials:", e.target.value);
+    //const courseId = parseInt(e.target.value);
+    //setSelectedCourseId(courseId);
+    //console.log("Selected course ID:", courseId); // Debug log
+  };
 
   // Handle file selection for material upload
   const handleFileChange = (e) => {
     setMaterialFile(e.target.files[0]);
+    console.log("Selected material file:", e.target.files[0]?.name);
   };
 
   //const handleCourseSelect = (e) => {
@@ -151,10 +153,14 @@ export default function Admin() {
     formData.append("email", "admin@uniben.edu");
     console.log("FormData contents:", Array.from(formData.entries())); // Debug log
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        timeout: 60000, // 60-second timeout
-      });
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/courses/upload-file`, 
+        formData, 
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 60000, // 60-second timeout
+        }
+      );
       alert("Material uploaded successfully!");
       const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
       setCourses(data); // Refresh courses to update materials
@@ -180,6 +186,7 @@ export default function Admin() {
   // Handle file selection for exam upload
   const handleExamFileChange = (e) => {
     setExamFile(e.target.files[0]);
+    console.log("Selected exam file:", e.target.files[0]?.name);
   };
 
   // Handle exam upload
@@ -220,6 +227,43 @@ export default function Admin() {
     }
   };
 
+    // Maual Upload/Update...
+  // Add state and handler at the top
+  const [examQuestions, setExamQuestions] = useState(JSON.stringify({ questions: [] }, null, 2));
+
+  // Add handler function
+  const handleManualExamInput = async () => {
+    if (!selectedExamCourseId || isNaN(selectedExamCourseId) || selectedExamCourseId <= 0) {
+      alert("Please select a valid course!");
+      return;
+    }
+    if (!examName || examName.trim() === "") {
+      alert("Please enter a valid exam name!");
+      return;
+    }
+    try {
+      const parsedQuestions = JSON.parse(examQuestions);
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/courses/admin/exams`,
+        {
+          name: examName,
+          questions: parsedQuestions,
+          courseId: selectedExamCourseId,
+          email: "admin@uniben.edu",
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+          timeout: 60000,
+        }
+      );
+      alert("Exam created/updated successfully!");
+    } catch (error) {
+      console.error("Manual exam input error:", error.response?.data || error.message);
+      alert("Failed to create/update exam: " + (error.response?.data?.error || error.message));
+    }
+  };
+
+
   if (!location.pathname.startsWith("/admin")) {
     console.log("Invalid admin path detected, redirecting to /admin/courses");
     return <Navigate to="/admin/courses" replace />;
@@ -248,6 +292,10 @@ export default function Admin() {
             <input type="number" className="border p-2 m-2 w-full rounded" placeholder="Level (e.g., 100)" onChange={(e) => setCourseForm({ ...courseForm, level: parseInt(e.target.value) || 100 })} />
             <button onClick={handleCourseSubmit} className="bg-green-500 text-white p-2 rounded mt-2">Upload Course</button>
             <div className="mt-4">
+              <select onChange={(e) => setSelectedCourseId(e.target.value)} className="border p-2 m-2 w-full rounded">
+                <option value="">Select Course</option>
+                {courses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}
+              </select>
               <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
               <button onClick={handleFileUpload} className="bg-purple-500 text-white p-2 rounded">Upload Excel File</button>
             </div>
@@ -292,17 +340,32 @@ export default function Admin() {
               <h3 className="text-lg font-semibold">Upload Course Material (PDF)</h3>
               <select
                 className="border p-2 m-2 w-full rounded"
-                value={selectedCourseId}
-                onChange={(e) => setSelectedCourseId(e.target.value)}
+                onChange={handleCourseSelect}
+                value={selectedCourseId || ""}
+               // onChange={(e) => setSelectedCourseId(e.target.value)}
               >
                 <option value="">Select Course</option>
                 {courses.map(course => (
-                  <option key={course.id} value={course.id}>{course.title} (ID: {course.id})</option>
+                  <option key={course.id} value={course.id}>
+                    {course.title} (ID: {course.id})
+                  </option>
                 ))}
               </select>
-              <input type="file" accept="application/pdf" onChange={(e) => setMaterialFile(e.target.files[0])} className="m-2" />
-              <button onClick={handleMaterialUpload} className="bg-blue-500 text-white p-2 rounded">Upload PDF</button>
+              <input 
+                type="file" 
+                accept="application/pdf" 
+                //onChange={(e) => setMaterialFile(e.target.files[0])} 
+                onChange={handleFileChange}
+                className="m-2" 
+              />
+              <button 
+                onClick={handleMaterialUpload} 
+                className="bg-blue-500 text-white p-2 rounded"
+              >
+                Upload PDF
+              </button>
             </div>
+            
             {courses.length > 0 && (
               <div className="mt-4">
                 <h3 className="text-lg font-semibold">Existing Courses</h3>
@@ -345,16 +408,56 @@ export default function Admin() {
                 ))}
               </div>
             )}
+
+
+              
+            
           </div>
+
         } />
       </Routes>
     </div>
   );
 }
 
-
       
+/* Manual Exam Input Section 
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold mb-2">Manual Exam Input</h2>
+              <select
+                onChange={handleExamCourseSelect}
+                value={selectedExamCourseId || ""}
+                className="border p-2 mb-2 w-full"
+              >
+                <option value="">Select a course</option>
+                {courses.map(course => (
+                  <option key={course.id} value={course.id}>
+                    {course.title} (ID: {course.id})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Exam Name"
+                value={examName}
+                onChange={handleExamNameChange}
+                className="border p-2 mb-2 w-full"
+              />
+              <textarea
+                placeholder="Enter questions in JSON format (e.g., { questions: [{ question: '...', options: [...], correctAnswer: '...' }] })"
+                value={JSON.stringify({ questions: [] }, null, 2)}
+                onChange={(e) => setExamQuestions(e.target.value)}
+                className="border p-2 mb-2 w-full h-32"
+              />
+              <button
+                onClick={handleManualExamInput}
+                className="bg-purple-500 text-white p-2 rounded hover:bg-purple-600"
+              >
+                Submit Exam
+              </button>
+            </div>
 
+*/
 
 /*
 import { useState } from "react";

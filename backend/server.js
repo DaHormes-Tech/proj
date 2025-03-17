@@ -8,12 +8,14 @@ const dotenv = require("dotenv");
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 
+
 // Load environment variables first
 dotenv.config();
 console.log("Environment Variables:");
 console.log("SUPABASE_URL:", process.env.SUPABASE_URL);
 console.log("SUPABASE_KEY:", process.env.SUPABASE_KEY);
 console.log("PORT:", process.env.PORT);
+
 
 // Initialize Express *after* dotenv
 const app = express();

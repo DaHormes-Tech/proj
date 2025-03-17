@@ -31,10 +31,11 @@ export default function Exam() {
           return;
         }
         // Shuffle questions and options for freshness
-        const shuffledQuestions = shuffleArray(selectedExam.questions.questions.map(q => ({
-          ...q,
-          options: shuffleArray(q.options)
-        })));
+        //const shuffledQuestions = shuffleArray(selectedExam.questions.questions.map(q => ({
+        //  ...q,
+        //  options: shuffleArray(q.options)
+        //})));
+        const shuffledQuestions = shuffleArray(exam.questions.questions || exam.questions || []);
         setExam({ ...selectedExam, questions: { questions: shuffledQuestions } });
         setError("");
       } catch (error) {

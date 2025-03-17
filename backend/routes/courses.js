@@ -2,9 +2,9 @@
 console.log("Loading routes/courses.js..."); // Debug to confirm file is loaded
 
 const express = require("express");
-//const { supabase } = require("../config/supabase"); // Use global supabase config
+const { supabase } = require("../config/supabase"); // Use global supabase config
 const multer = require("multer");
-const { supabase } = require("../supabaseClient", "../config/supabase");
+//const { supabase } = require("../supabaseClient", "../config/supabase");
 const upload = multer({ storage: multer.memoryStorage() }); // Use memory storage for Supabase
 const XLSX = require("xlsx"); // For parsing Excel files
 const router = express.Router();
@@ -27,6 +27,19 @@ const withTimeout = (promise, ms) => {
     setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms);
   });
   return Promise.race([promise, timeout]);
+};
+
+// Retry function for network requests
+const withRetry = async (operation, maxRetries = 3, delay = 2000) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(`Attempt ${attempt} failed:`, error.message);
+      if (attempt === maxRetries) throw error;
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
 };
 
 // Add course (admin only)
@@ -149,12 +162,11 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
     while (attempt < maxRetries) {
       try {
         const response = await withTimeout(
-          supabase.storage
-            .from("course-materials")
-            .upload(fileName, file.buffer, {
-              contentType: file.mimetype,
-              upsert: true,
-            }),
+          supabase
+            .from("courses")
+            .select("id, title, materials")
+            .eq("id", numericCourseId)
+            .single(),
           30000 // 30-second timeout
         );
         courseData = response.data;
@@ -297,6 +309,71 @@ router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => 
     res.status(500).json({ error: "Failed to upload exam questions: " + error.message });
   }
 });
+
+
+
+// Manual exam input (no file upload)
+router.post("/admin/exams", isAdmin, async (req, res) => {
+  try {
+    console.log("Handling /admin/exams route...");
+    console.log("Request body:", req.body);
+    const { name, questions, courseId } = req.body;
+    console.log("Received name:", name, "questions:", questions, "courseId:", courseId);
+
+    if (!name || !questions || !courseId || isNaN(parseInt(courseId)) || parseInt(courseId) <= 0) {
+      return res.status(400).json({ error: "Valid exam name, questions, and course ID are required" });
+    }
+
+    const numericCourseId = parseInt(courseId);
+
+    // Validate questions format
+    const parsedQuestions = Array.isArray(questions.questions)
+      ? questions.questions
+      : JSON.parse(questions).questions || [];
+    if (!parsedQuestions.length || !parsedQuestions.every(q => q.question && q.options && q.correctAnswer)) {
+      return res.status(400).json({ error: "Invalid questions format" });
+    }
+
+    // Check if exam exists, create or update
+    const { data: existingExam, error: fetchError } = await supabase
+      .from("exams")
+      .select("id, course_id, name, questions")
+      .eq("course_id", numericCourseId)
+      .eq("name", name)
+      .single();
+
+    let examData;
+    if (fetchError && fetchError.code !== "PGRST116") {
+      console.error("Exam fetch error:", fetchError.message);
+      throw fetchError;
+    }
+
+    if (existingExam) {
+      const updatedQuestions = existingExam.questions ? [...existingExam.questions, ...parsedQuestions] : parsedQuestions;
+      const { data: updateData, error: updateError } = await supabase
+        .from("exams")
+        .update({ questions: updatedQuestions })
+        .eq("id", existingExam.id)
+        .select();
+      if (updateError) throw updateError;
+      examData = updateData[0];
+    } else {
+      const { data: insertData, error: insertError } = await supabase
+        .from("exams")
+        .insert({ course_id: numericCourseId, name, questions: parsedQuestions })
+        .select();
+      if (insertError) throw insertError;
+      examData = insertData[0];
+    }
+
+    console.log(`Successfully updated/created exam for course ${numericCourseId}`, examData);
+    res.json({ message: "Exam created/updated successfully", examId: examData.id });
+  } catch (error) {
+    console.error("Exam creation error:", error.message);
+    res.status(500).json({ error: "Failed to create/update exam: " + error.message });
+  }
+});
+
 
 
 module.exports = router; // Export the router directly
