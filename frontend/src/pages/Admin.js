@@ -104,11 +104,10 @@ export default function Admin() {
       return;
     }
     const formData = new FormData();
-    formData.append("file", file);
-    formData.append("courseId", "1"); // Default or dynamic value from UI  
+    formData.append("file", file); 
     formData.append("email", "admin@uniben.edu");
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/upload-file`, formData);
+      await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/bulk-upload-courses`, formData);
       alert("Courses uploaded!");
       const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
       setCourses(data);
@@ -142,6 +141,10 @@ export default function Admin() {
       alert("Please select a PDF file first!");
       return;
     }
+    if (materialFile.size > 10 * 1024 * 1024) { // 10MB limit
+      alert("File size exceeds 10MB. Please upload a smaller file.");
+      return;
+    }
     console.log("Selected Course ID from state:", selectedCourseId); // Debug log
     if (!selectedCourseId || isNaN(parseInt(selectedCourseId)) || parseInt(selectedCourseId) <= 0) {
       alert("Please select a valid course!");
@@ -158,7 +161,7 @@ export default function Admin() {
         formData, 
         {
           headers: { "Content-Type": "multipart/form-data" },
-          timeout: 60000, // 60-second timeout
+          timeout: 120000, // 120-second timeout
         }
       );
       alert("Material uploaded successfully!");
@@ -292,10 +295,7 @@ export default function Admin() {
             <input type="number" className="border p-2 m-2 w-full rounded" placeholder="Level (e.g., 100)" onChange={(e) => setCourseForm({ ...courseForm, level: parseInt(e.target.value) || 100 })} />
             <button onClick={handleCourseSubmit} className="bg-green-500 text-white p-2 rounded mt-2">Upload Course</button>
             <div className="mt-4">
-              <select onChange={(e) => setSelectedCourseId(e.target.value)} className="border p-2 m-2 w-full rounded">
-                <option value="">Select Course</option>
-                {courses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}
-              </select>
+             
               <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files[0])} className="m-2" />
               <button onClick={handleFileUpload} className="bg-purple-500 text-white p-2 rounded">Upload Excel File</button>
             </div>

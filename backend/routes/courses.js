@@ -78,11 +78,85 @@ router.post("/add-exam/:courseId", isAdmin, async (req, res) => {
 });
 
 // Get exams for a course
+/*
 router.get("/exams/:courseId", async (req, res) => {
   const { courseId } = req.params;
   const { data, error } = await supabase.from("exams").select("*").eq("course_id", courseId);
   if (error) return res.status(400).json({ error: error.message }); // Handle fetch errors
   res.json(data);
+}); 
+*/
+router.get("/exams/:courseId", async (req, res) => {
+  const { courseId } = req.params;
+  console.log(`Fetching exams for courseId: ${courseId}`); // Debug log
+  try {
+    const { data, error } = await supabase
+      .from("exams")
+      .select("*")
+      .eq("course_id", parseInt(courseId));
+    if (error) {
+      console.error("Supabase error:", error.message);
+      return res.status(400).json({ error: error.message });
+    }
+    console.log("Fetched exams:", data);
+    res.json(data);
+  } catch (error) {
+    console.error("Fetch exams error:", error.message);
+    res.status(500).json({ error: "Failed to fetch exams: " + error.message });
+  }
+});
+
+// Bulk upload courses via Excel
+router.post("/bulk-upload-courses", upload.single("file"), isAdmin, async (req, res) => {
+  try {
+    console.log("Handling /bulk-upload-courses route...");
+    console.log("Request body after Multer:", req.body);
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const file = req.file;
+    console.log("File details:", file);
+
+    // Parse Excel file
+    const workbook = XLSX.read(file.buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(sheet);
+    console.log("Parsed Excel data:", jsonData);
+
+    // Validate and transform Excel data into course format
+    const courses = jsonData.map(row => {
+      if (!row.title || !row.short_summary || !row.full_summary || !row.faculty || !row.level) {
+        throw new Error("Excel file must have 'title', 'short_summary', 'full_summary', 'faculty', and 'level' columns");
+      }
+      return {
+        title: row.title,
+        short_summary: row.short_summary,
+        full_summary: row.full_summary,
+        faculty: row.faculty,
+        level: parseInt(row.level),
+        qa: row.qa ? JSON.parse(row.qa) : { questions: [] }, // Default to empty if not provided
+        materials: [], // Initialize empty materials
+      };
+    });
+
+    // Insert courses into Supabase
+    const { data, error } = await supabase
+      .from("courses")
+      .insert(courses)
+      .select();
+    if (error) {
+      console.error("Supabase error:", error.message);
+      return res.status(400).json({ error: error.message });
+    }
+
+    console.log("Successfully added courses:", data);
+    res.json({ message: "Courses uploaded successfully", data });
+  } catch (error) {
+    console.error("Bulk upload error:", error.message);
+    res.status(500).json({ error: "Failed to upload courses: " + error.message });
+  }
 });
 
 // Upload course or material file (e.g., PDF)
@@ -111,6 +185,25 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
 
     const fileName = `${numericCourseId}/${Date.now()}_${file.originalname}`;
 
+    console.log("Uploading to Supabase Storage with resumable upload...");
+
+    const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("course-materials")
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+        duplex: "half", // Enable resumable upload
+        chunkSize: chunkSize,
+      });
+
+    if (uploadError) {
+      console.error("Supabase Storage error:", uploadError.message);
+      throw uploadError;
+    }
+    console.log("Storage upload successful, public URL generating...");
+
+
     // Upload to Supabase Storage with timeout and retry
     console.log("Uploading to Supabase Storage...");
     const maxRetries = 3;
@@ -125,7 +218,7 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
               contentType: file.mimetype,
               upsert: true,
             }),
-          30000 // 30-second timeout
+          60000 // 60-second timeout
         );
         
         storageData = response.data;
@@ -165,8 +258,7 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
           supabase
             .from("courses")
             .select("id, title, materials")
-            .eq("id", numericCourseId)
-            .single(),
+            .eq("id", numericCourseId),
           30000 // 30-second timeout
         );
         courseData = response.data;
@@ -189,6 +281,7 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
       return res.status(404).json({ error: `Course with ID ${numericCourseId} not found` });
     }
 
+    courseData = courseData[0]; // Take the first result
     console.log("Fetched course data:", courseData); // Debug log
 
     // Update materials field, preserving existing data
@@ -217,6 +310,7 @@ router.post("/upload-file", upload.single("file"), isAdmin, async (req, res) => 
 });
 
 
+// Upload exam questions via Excel
 // Upload exam questions via Excel
 router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => {
   try {
@@ -255,7 +349,6 @@ router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => 
       if (!row.question || !row.options || !row.correctAnswer) {
         throw new Error("Excel file must have 'question', 'options', and 'correctAnswer' columns");
       }
-      // Options should be a comma-separated string in Excel, e.g., "Protein,Gene,Sugar,Fat"
       const options = row.options.split(",").map(opt => opt.trim());
       if (options.length < 2) {
         throw new Error("Each question must have at least 2 options");
@@ -269,6 +362,9 @@ router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => 
         correctAnswer: row.correctAnswer,
       };
     });
+
+    // Ensure the format matches manual upload
+    const formattedQuestions = { questions };
 
     // Check if exam exists, create or update
     const { data: existingExam, error: fetchError } = await supabase
@@ -285,10 +381,12 @@ router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => 
     }
 
     if (existingExam) {
-      const updatedQuestions = existingExam.questions ? [...existingExam.questions, ...questions] : questions;
+      const updatedQuestions = existingExam.questions?.questions
+        ? [...existingExam.questions.questions, ...questions]
+        : questions;
       const { data: updateData, error: updateError } = await supabase
         .from("exams")
-        .update({ questions: updatedQuestions })
+        .update({ questions: { questions: updatedQuestions } })
         .eq("id", existingExam.id)
         .select();
       if (updateError) throw updateError;
@@ -296,7 +394,7 @@ router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => 
     } else {
       const { data: insertData, error: insertError } = await supabase
         .from("exams")
-        .insert({ course_id: numericCourseId, name: examName, questions })
+        .insert({ course_id: numericCourseId, name: examName, questions: formattedQuestions })
         .select();
       if (insertError) throw insertError;
       examData = insertData[0];
@@ -309,7 +407,6 @@ router.post("/upload-exam", upload.single("file"), isAdmin, async (req, res) => 
     res.status(500).json({ error: "Failed to upload exam questions: " + error.message });
   }
 });
-
 
 
 // Manual exam input (no file upload)

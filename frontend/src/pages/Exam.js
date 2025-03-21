@@ -26,7 +26,8 @@ export default function Exam() {
           setError("Exam not found.");
           return;
         }
-        if (!selectedExam.questions || !selectedExam.questions.questions || selectedExam.questions.questions.length === 0) {
+        const examQuestions = selectedExam.questions?.questions || selectedExam.questions || [];
+        if (!examQuestions.length) {
           setError("No questions available for this exam.");
           return;
         }
@@ -34,12 +35,15 @@ export default function Exam() {
         //const shuffledQuestions = shuffleArray(selectedExam.questions.questions.map(q => ({
         //  ...q,
         //  options: shuffleArray(q.options)
-        //})));
-        const shuffledQuestions = shuffleArray(exam.questions.questions || exam.questions || []);
+          //})));
+        const shuffledQuestions = shuffleArray(examQuestions.map(q => ({
+          ...q,
+          options: shuffleArray(q.options)
+        })));
         setExam({ ...selectedExam, questions: { questions: shuffledQuestions } });
         setError("");
       } catch (error) {
-        console.log("Fetch exam error:", error.response?.data || error.message); // Log any API errors
+        console.log("Fetch exam error:", error.response?.data || error.message);
         setError("Failed to load exam. Check course and exam IDs or server status.");
       }
     };
