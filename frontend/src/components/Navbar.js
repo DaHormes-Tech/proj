@@ -1,11 +1,40 @@
 
-import { Link } from "react-router-dom";
+import { useContext } from 'react';
+import { Link } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+
 
 export default function Navbar() {
+  const { user, signOut } = useContext(AuthContext);
+
+
+  return (
+    <nav className="bg-gray-800 p-4">
+      <div className="max-w-7xl mx-auto flex justify-between">
+        <div className="flex space-x-4">
+          <Link to="/courses" className="mr-4 hover:text-gray-300">Courses</Link>
+          {user?.role === 'admin' && (
+            <Link to="/admin" className="mr-4 hover:text-gray-300">Admin</Link>
+          )}
+        </div>
+        {user && (
+          <button onClick={signOut} className="text-white">
+            Sign Out
+          </button>
+        )}
+      </div>
+    </nav>
+  );
+  
+}
+
+/*
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     window.location.href = "/";
   };
+
 
   return (
     <nav className="bg-gray-800 text-white p-4 flex justify-between">
@@ -18,7 +47,8 @@ export default function Navbar() {
       )}
     </nav>
   );
-}
+*/
+
 
 /*
 import { Link } from "react-router-dom";

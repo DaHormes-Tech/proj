@@ -1,7 +1,11 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Link, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import axios from "axios";
+
+import { AuthContext } from '../context/AuthContext';
+import api from '../api'; // Use api instead of axios
+
 
 // Admin portal component for managing courses and exams, designed for scalability and readability
 export default function Admin() {
@@ -33,10 +37,12 @@ export default function Admin() {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+        //const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+        const { data } = await api.get('/api/courses/list'); // Use api
         setCourses(data);
         for (const course of data) {
-          const { data: examsData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${course.id}`);
+          //const { data: examsData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${course.id}`);
+          const { data: examsData } = await api.get('/api/courses/exams/${course.id}'); // Use api
           setExams(prev => ({ ...prev, [course.id]: examsData }));
         }
       } catch (error) {
@@ -68,8 +74,10 @@ export default function Admin() {
   const handleCourseSubmit = async () => {
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-course`, courseForm);
+      //await api.post(`/api/courses/add-course`, courseForm);
       alert("Course added!");
-      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      //const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      const { data } = await api.get(`/api/courses/list`);
       setCourses(data);
     } catch (error) {
       console.log("Course upload error:", error.response?.data || error.message);
@@ -89,8 +97,10 @@ export default function Admin() {
         email: examForm.email
       };
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/add-exam/${examForm.courseId}`, formattedExam);
+      //await api.post(`/api/courses/add-exam/${examForm.courseId}`, formattedExam);
       alert("Exam added!");
-      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${examForm.courseId}`);
+      //const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${examForm.courseId}`);
+      const { data } = await api.get(`/api/courses/exams/${examForm.courseId}`);
       setExams(prev => ({ ...prev, [examForm.courseId]: data }));
     } catch (error) {
       console.log("Exam upload error:", error.response?.data || error.message);
@@ -108,8 +118,10 @@ export default function Admin() {
     formData.append("email", "admin@uniben.edu");
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/api/courses/bulk-upload-courses`, formData);
+      //await api.post(`/api/courses/bulk-upload-courses`, formData);
       alert("Courses uploaded!");
-      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      //const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      const { data } = await api.get(`/api/courses/list`);
       setCourses(data);
     } catch (error) {
       console.log("File upload error:", error.response?.data || error.message);
@@ -165,7 +177,8 @@ export default function Admin() {
         }
       );
       alert("Material uploaded successfully!");
-      const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      //const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+      const { data } = await api.get(`/api/courses/list`);
       setCourses(data); // Refresh courses to update materials
     } catch (error) {
       console.log("Material upload error:", error.response?.data || error.message);

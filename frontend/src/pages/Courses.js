@@ -1,9 +1,12 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { db, syncCourses } from "../database";
-import axios from "axios";
+//import axios from "axios";
 import CourseCard from "../components/CourseCard";
 import { Link } from "react-router-dom";
+
+import { AuthContext } from '../context/AuthContext';
+import api from '../api'; // Use api instead of axios
 
 // Courses list component for users, displaying courses and linking to exams/details with enhanced UI
 export default function Courses() {
@@ -11,11 +14,14 @@ export default function Courses() {
   const [exams, setExams] = useState({});
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const { user, loading } = useContext(AuthContext); // Add AuthContext
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data: courseData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
+        console.log('Fetching courses from API');
+        const { data: courseData } = await api.get('/api/courses/list'); // Use api
+        //const { data: courseData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/list`);
         console.log("Fetched courses from API:", courseData);
         const parsedCourses = courseData.map(course => ({
           ...course,
@@ -27,8 +33,18 @@ export default function Courses() {
 
         const examsData = {};
         for (const course of offlineCourses) {
-          const { data: examData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${course.id}`);
-          examsData[course.id] = examData;
+          try {
+            console.log(`Fetching exams for course ID: ${course.id}`);
+            const { data: examData } = await api.get(`/api/courses/exams/${course.id}`);
+            console.log(`Exams for course ${course.id}:`, examData);
+            examsData[course.id] = examData || [];
+          } catch (examError) {
+            console.error(`Failed to fetch exams for course ${course.id}:`, examError.response?.data || examError.message);
+            examsData[course.id] = [];
+          }
+          //const { data: examData } = await api.get(`/api/courses/exams/${course.id}`); // Use api
+          //const { data: examData } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${course.id}`);
+          //examsData[course.id] = examData;
         }
         setExams(examsData);
         setError("");
@@ -39,11 +55,18 @@ export default function Courses() {
         setCourses(offlineCourses);
       }
     };
-    fetchData();
-  }, []);
+
+    if (!loading && user) {
+      fetchData(); // Only fetch when authenticated
+    }
+
+    //fetchData();
+  }, [loading, user]);
 
   const filteredCourses = courses.filter(c => c.title.toLowerCase().includes(search.toLowerCase()));
-
+  
+  if (loading) return <div className="p-4">Loading...</div>;
+  
   return (
     <div className="p-4 max-w-4xl mx-auto min-h-screen bg-gray-100">
       <h1 className="text-3xl font-bold text-center mb-6 text-blue-700">Course Catalog</h1>

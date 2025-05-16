@@ -2,6 +2,7 @@
   "name": "edtech-frontend",
   "version": "0.1.0",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "axios": "^1.6.0",
     "dexie": "^3.2.4",
     "react": "^18.2.0",

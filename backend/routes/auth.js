@@ -26,7 +26,9 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 // Register
 router.post("/register", async (req, res) => {
   const { email, password } = req.body;
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await withRetry(() => 
+    supabase.auth.signUp({ email, password })
+  );
   if (error) {
     if (error.message.includes("already registered")) {
       return res.status(400).json({ error: "This email is already in use. Please log in or use a different email." });
@@ -34,24 +36,33 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ error: error.message });
   }
   if (!data.user) return res.status(500).json({ error: "No user data returned" });
-  const token = jwt.sign({ id: data.user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-  res.json({ token });
+  res.json({ token: data.session.access_token });
+  //const token = jwt.sign({ id: data.user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  //res.json({ token });
 });
 
-// Login
 
+// Login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await withRetry(() =>
+    supabase.auth.signInWithPassword({ email, password })
+    );
     if (error) return res.status(401).json({ error: error.message });
-    const token = jwt.sign({ id: data.user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    res.json({ token });
+    res.json({ token: data.session.access_token });
+    //const token = jwt.sign({ id: data.user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    //res.json({ token });
   } catch (err) {
     console.log("Login error:", err);
     res.status(500).json({ error: "Login failed, please try again" });
   }
 });
+
+
+
+module.exports = router;
+
 
 /*
 router.post("/login", async (req, res) => {
@@ -62,7 +73,6 @@ router.post("/login", async (req, res) => {
   res.json({ token });
 }); */
 
-module.exports = router;
 
 
 

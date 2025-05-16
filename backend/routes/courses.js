@@ -12,7 +12,8 @@ const router = express.Router();
 // Middleware to check admin access
 const isAdmin = (req, res, next) => {
   console.log("Request body after multer:", req.body); // Debug log
-  const email = req.body.email || req.query.email || (req.auth && req.auth.user && req.auth.user.email);
+  const email = req.body.email || req.query.email || (req.user && req.user.email);
+  //const email = req.body.email || req.query.email || (req.auth && req.auth.user && req.auth.user.email);
   console.log("Checking admin access for email:", email);
 
   if (email !== "admin@uniben.edu") {
@@ -42,39 +43,22 @@ const withRetry = async (operation, maxRetries = 3, delay = 2000) => {
   }
 };
 
-// Add course (admin only)
-router.post("/add-course", isAdmin, async (req, res) => {
-  const { title, short_summary, full_summary, qa, faculty, level } = req.body;
-  console.log("Course upload attempt:", { title, short_summary, full_summary, qa, faculty, level });
-  const { data, error } = await supabase
-    .from("courses")
-    .insert([{ title, short_summary, full_summary, qa, faculty, level }]) // qa is already an object
-    .select();
-  if (error) {
-    console.log("Supabase error:", error);
-    return res.status(400).json({ error: error.message });
-  }
-  res.json({ message: "Course added", data });
-});
 
 // Fetch courses (for frontend)
-router.get("/list", async (req, res) => {
-  const { data, error } = await supabase.from("courses").select("*");
-  if (error) return res.status(400).json({ error: error.message }); // Handle fetch errors
-  res.json(data);
-});
-
-// Add exam for a course (admin only)
-router.post("/add-exam/:courseId", isAdmin, async (req, res) => {
-  const { courseId } = req.params;
-  const { name, questions } = req.body; // e.g., { name: "Exam 1", questions: [{question, options, correctAnswer}] }
-  console.log("Adding exam for course:", courseId, "Exam:", { name, questions }); // Log exam details
-  const { data, error } = await supabase
-    .from("exams")
-    .insert([{ name, course_id: courseId, questions }])
-    .select();
-  if (error) return res.status(400).json({ error: error.message }); // Handle insertion errors
-  res.json({ message: "Exam added", data });
+router.get('/list', async (req, res) => {
+  console.log('Fetching all courses');
+  try {
+    const { data, error } = await supabase.from('courses').select('*');
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(400).json({ error: error.message });
+    }
+    console.log('Fetched courses:', data);
+    res.json(data);
+  } catch (error) {
+    console.error('Fetch courses error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch courses: ' + error.message });
+  }
 });
 
 // Get exams for a course
@@ -90,6 +74,10 @@ router.get("/exams/:courseId", async (req, res) => {
   const { courseId } = req.params;
   console.log(`Fetching exams for courseId: ${courseId}`); // Debug log
   try {
+    const parsedId = parseInt(courseId);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid course ID' });
+    }
     const { data, error } = await supabase
       .from("exams")
       .select("*")
@@ -105,6 +93,68 @@ router.get("/exams/:courseId", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch exams: " + error.message });
   }
 });
+
+// Fetch single course
+router.get('/:courseId', async (req, res) => {
+  const { courseId } = req.params;
+  console.log(`Fetching course with ID: ${courseId}`);
+  try {
+    const parsedId = parseInt(courseId);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ error: 'Invalid course ID' });
+    }
+    console.log(`Querying Supabase for course ID: ${parsedId}`);
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', parseInt(courseId))
+      .single();
+    if (error) {
+      console.error('Supabase error:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+    if (!data) {
+      console.warn(`No course found for ID: ${parsedId}`);
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    console.log('Fetched course:', data);
+    res.json(data);
+  } catch (error) {
+    console.error('Fetch course error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch course: ' + error.message });
+  }
+});
+
+
+// Add course (admin only)
+router.post("/add-course", isAdmin, async (req, res) => {
+  const { title, short_summary, full_summary, qa, faculty, level } = req.body;
+  console.log("Course upload attempt:", { title, short_summary, full_summary, qa, faculty, level });
+  const { data, error } = await supabase
+    .from("courses")
+    .insert([{ title, short_summary, full_summary, qa, faculty, level }]) // qa is already an object
+    .select();
+  if (error) {
+    console.log("Supabase error:", error);
+    return res.status(400).json({ error: error.message });
+  }
+  res.json({ message: "Course added", data });
+});
+
+
+// Add exam for a course (admin only)
+router.post("/add-exam/:courseId", isAdmin, async (req, res) => {
+  const { courseId } = req.params;
+  const { name, questions } = req.body; // e.g., { name: "Exam 1", questions: [{question, options, correctAnswer}] }
+  console.log("Adding exam for course:", courseId, "Exam:", { name, questions }); // Log exam details
+  const { data, error } = await supabase
+    .from("exams")
+    .insert([{ name, course_id: courseId, questions }])
+    .select();
+  if (error) return res.status(400).json({ error: error.message }); // Handle insertion errors
+  res.json({ message: "Exam added", data });
+});
+
 
 // Bulk upload courses via Excel
 router.post("/bulk-upload-courses", upload.single("file"), isAdmin, async (req, res) => {

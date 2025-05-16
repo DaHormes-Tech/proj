@@ -8,6 +8,10 @@ const dotenv = require("dotenv");
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 
+//Auth
+const authMiddleware = require('./middleware/authMiddleware'); // Import middleware
+
+
 
 // Load environment variables first
 dotenv.config();
@@ -29,9 +33,10 @@ const authRoutes = require("./routes/auth");
 const paymentRoutes = require("./routes/payment");
 const courseRouter = require("./routes/courses"); //Pass upload here
 
-app.use("/api/auth", authRoutes);
-app.use("/api/payment", paymentRoutes);
-app.use("/api/courses", courseRouter);
+
+app.use("/api/auth", authRoutes); // Public route
+app.use("/api/payment", authMiddleware, paymentRoutes); // Protected
+app.use("/api/courses", authMiddleware, courseRouter); // Auth User "authMiddleware"
 
 app.get("/", (req, res) => res.send("EdTeech API running"));
 

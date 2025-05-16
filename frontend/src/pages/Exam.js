@@ -1,7 +1,9 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
+//import axios from "axios";
+import api from '../api'; // Use api instead of axios
+import { AuthContext } from '../context/AuthContext';
 
 // CBT exam interface for courses, with robust error handling and randomization
 export default function Exam() {
@@ -11,13 +13,15 @@ export default function Exam() {
   const [submitted, setSubmitted] = useState(false); // Track if exam is submitted
   const [score, setScore] = useState({ fraction: "0/0", percentage: 0 }); // Track exam score
   const [error, setError] = useState(""); // Track errors
+  const { user, loading } = useContext(AuthContext); // Add AuthContext
 
   // Fetch exam data when component mounts or params change
   useEffect(() => {
     const fetchExam = async () => {
       try {
         console.log(`Fetching exam for course ${courseId}, exam ${examId}`); // Debug: Log fetch attempt
-        const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${courseId}`);
+        const { data } = await api.get(`/api/courses/exams/${courseId}`); // Use api
+        //const { data } = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses/exams/${courseId}`);
         console.log("Exam data response:", data); // Debug: Log API response
         // Match by ID (numeric)
         const numericExamId = parseInt(examId);
@@ -47,8 +51,12 @@ export default function Exam() {
         setError("Failed to load exam. Check course and exam IDs or server status.");
       }
     };
-    fetchExam();
-  }, [courseId, examId]); // Re-run on route param changes
+    
+    if (!loading && user) {
+      fetchExam(); // Only fetch when authenticated
+    }
+    //fetchExam();
+  }, [courseId, examId, loading, user]); // Re-run on route param changes
 
   // Fisher-Yates shuffle algorithm for randomizing arrays
   const shuffleArray = (array) => {
@@ -96,6 +104,7 @@ export default function Exam() {
   };
 
   // Handle errors or loading states
+  if (loading) return <div className="p-4">Loading...</div>;
   if (error) return <div className="p-4 text-red-500">{error}</div>; // Display error message if any
   if (!exam) return <div className="p-4">Loading exam...</div>; // Show loading while fetching
 
