@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useContext } from "react";
+import { useNavigate } from 'react-router-dom'; // Add useNavigate
 import { db, syncCourses } from "../database";
 //import axios from "axios";
 import CourseCard from "../components/CourseCard";
@@ -15,6 +16,7 @@ export default function Courses() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const { user, loading } = useContext(AuthContext); // Add AuthContext
+  const navigate = useNavigate(); // Add navigate hook
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,7 +54,14 @@ export default function Courses() {
         console.log("Fetch error:", error.response?.data || error.message);
         setError("Failed to load courses/exams. Showing offline data if available.");
         const offlineCourses = await db.courses.toArray();
-        setCourses(offlineCourses);
+        //setCourses(offlineCourses);
+        if (offlineCourses.length > 0) {
+          setCourses(offlineCourses);
+          setError('Showing offline data. Some features may be unavailable.');
+        } else {
+          setCourses([]);
+          setError('No offline data available. Please check your connection and try again.');
+        }
       }
     };
 
@@ -93,7 +102,12 @@ export default function Courses() {
                     <button className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 transition-colors">Take Exam</button>
                     <select
                       className="border-2 border-gray-300 p-2 rounded-lg w-full md:w-auto focus:outline-none focus:ring-2 focus:ring-green-500"
-                      onChange={(e) => window.location.href = `/courses/${course.id}/exam/${e.target.value}`}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          navigate(`/courses/${course.id}/exam/${e.target.value}`); // Use navigate
+                        }
+                      }}
+                        //window.location.href = `/courses/${course.id}/exam/${e.target.value}`}
                     >
                       <option value="">Select Exam</option>
                       {exams[course.id].map(exam => (
