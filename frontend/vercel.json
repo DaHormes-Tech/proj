@@ -5,6 +5,10 @@
       "use": "@vercel/static-build",
       "config": { "distDir": "build" }
     }
+    {
+      "src": "api/spa.js",
+      "use": "@vercel/node"
+    }
   ], 
   
 
